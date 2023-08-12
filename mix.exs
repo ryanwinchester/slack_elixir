@@ -8,24 +8,40 @@ defmodule Slack.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      dialyzer: [plt_file: {:no_warn, "priv/plts/project.plt"}]
+      dialyzer: [plt_file: {:no_warn, "priv/plts/project.plt"}],
+      description: description(),
+      package: package(),
+      name: "Slack Elixir",
+      source_url: "https://github.com/ryanwinchester/slack_elixir"
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
-      mod: {Slack.Application, []}
+      extra_applications: [:logger]
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # Testing and static analysis
+      {:req, "~> 0.3.0"},
+      {:websockex, "~> 0.4.3"},
+      {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.3", only: [:dev], runtime: false}
+    ]
+  end
+
+  defp description do
+    "Slack for Elixir using Socket Mode and Web API"
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/ryanwinchester/slack_elixir"}
     ]
   end
 end
