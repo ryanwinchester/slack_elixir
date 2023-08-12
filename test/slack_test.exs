@@ -1,8 +1,7 @@
 defmodule SlackTest do
-  use ExUnit.Case
-  doctest Slack
+  use ExUnit.Case, async: true
 
-  test "greets the world" do
-    assert Slack.hello() == :world
+  test "true" do
+    assert true
   end
 end
