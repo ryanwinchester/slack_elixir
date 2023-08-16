@@ -4,7 +4,7 @@ defmodule Slack.MixProject do
   def project do
     [
       app: :slack_elixir,
-      version: "0.1.0",
+      version: "0.1.1",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -30,7 +30,8 @@ defmodule Slack.MixProject do
       {:websockex, "~> 0.4.3"},
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.3", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.3", only: [:dev], runtime: false},
+      {:mimic, "~> 1.7", only: :test}
     ]
   end
 

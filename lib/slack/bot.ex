@@ -9,7 +9,7 @@ defmodule Slack.Bot do
   The return values will be either:
 
    - `:ok` - No-op, will `ack` immediately.
-   - `{:reply, reply}` - where `reply` can be a map or keyword with these
+   - `{:reply, reply}` - where `reply` can be a `t:map/0` or `t:keyword/0` with these
     arguments: https://api.slack.com/methods/chat.postMessage#args
 
   """
