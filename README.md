@@ -1,9 +1,17 @@
 # Slack
 
+[![Tests](https://github.com/ryanwinchester/slack_elixir/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanwinchester/slack_elixir/actions/workflows/ci.yml)
+ ![Hex.pm](https://img.shields.io/hexpm/v/slack_elixir)
+ ![Hex.pm](https://img.shields.io/hexpm/dt/slack_elixir)
+ ![Hex.pm](https://img.shields.io/hexpm/l/slack_elixir)
+
 This is for creating Slack applications or bots in Elixir.
 
-It uses **Socket Mode** to connect to Slack, which has some restrictions, so
+To listen for subscribed events, it uses **Socket Mode** to connect to Slack, which has some restrictions, so
 please read up on that.
+
+It's a relatively thin wrapper, which keeps it flexible and easy to maintain, but
+it does mean there are less conveniences than a full bot/app framework/SDK.
 
 ## Installation
 
@@ -81,3 +89,12 @@ For example:
     Supervisor.start_link(children, opts)
   end
 ```
+
+## Potential Roadmap (Things that may or may not be added)
+
+PRs welcome!
+
+- [x] **Socket Mode** for events
+- [x] Web API POST requests
+- [ ] Web API GET requests
+- [ ] Message Server per channel (rate-limited to 1 message per second per channel).
