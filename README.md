@@ -1,9 +1,9 @@
 # Slack
 
 [![Tests](https://github.com/ryanwinchester/slack_elixir/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanwinchester/slack_elixir/actions/workflows/ci.yml)
- ![Hex.pm](https://img.shields.io/hexpm/v/slack_elixir)
- ![Hex.pm](https://img.shields.io/hexpm/dt/slack_elixir)
- ![Hex.pm](https://img.shields.io/hexpm/l/slack_elixir)
+ [![Hex.pm](https://img.shields.io/hexpm/v/slack_elixir)](https://hex.pm/packages/slack_elixir)
+ [![Hex.pm](https://img.shields.io/hexpm/dt/slack_elixir)](https://hex.pm/packages/slack_elixir)
+ [![Hex.pm](https://img.shields.io/hexpm/l/slack_elixir)](https://github.com/ryanwinchester/slack_elixir/blob/main/LICENSE)
 
 This is for creating Slack applications or bots in Elixir.
 
