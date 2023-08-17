@@ -37,30 +37,52 @@ You will need to:
   - Get an app-level token with `connections:write` scope
   - Add Event Subscriptions
 
+See below for some minimum required scopes and event subscriptions. You will
+need to add more scopes and subscriptions depending on what you want to do.
+
+#### Required Bot Token scopes:
+ - `channels:history`
+ - `channels:read`
+ - `groups:read`
+ - `mpim:read`
+ - `im:read`
+
+#### Required Bot Event Subscriptions
+ - `message.channels`
+ - `member_joined_channel`
+ - `channel_left`
+
 Write the Bot module:
   
 ```elixir
 defmodule MyApp.Slackbot do
-  @behaviour Slack.Bot
+  use Slack.Bot
+
+  require Logger
 
   @impl true
-  def handle_event("message", %{"app_id" => _}) do
-    # Ignoring app/bot messages.
-    # This is helpful if you have a bot that responds to messages,
-    # and you don't want it to respond to itself.
-    :ok
+  # A silly example of old-school style bot commands.
+  def handle_event("message", %{"text" => "!" <> command, "channel" => channel, "user" => user}) do
+    case command do
+      "roll" ->
+        send_message(channel, "<@#{user}> rolled a #{Enum.random(1..6)}")
+
+      "echo " <> text ->
+        send_message(channel, text)
+
+      _ ->
+        send_message(channel, "Unknown command: #{command}")
+    end
   end
 
-  def handle_event("message", payload) do
-    if String.match?(payload["text"], ~r/hello/i) do
-      reply = "Hello! <@#{payload["user"]}>"
-      {:reply, channel: payload["channel"], text: reply}
-    else
-      :ok
+  def handle_event("message", %{"channel" => channel, "text" => text, "user" => user}) do
+    if String.match?(text, ~r/hello/i) do
+      send_message(channel, "Hello! <@#{user}>")
     end
   end
 
   def handle_event(type, payload) do
+    Logger.debug("Unhandled #{type} event: #{inspect(payload)}")
     :ok
   end
 end
@@ -90,11 +112,11 @@ For example:
   end
 ```
 
-## Potential Roadmap (Things that may or may not be added)
+## Journey to v1.0 (Things that may or may not be added)
 
 PRs welcome!
 
 - [x] **Socket Mode** for events
 - [x] Web API POST requests
-- [ ] Web API GET requests
-- [ ] Message Server per channel (rate-limited to 1 message per second per channel).
+- [x] Web API GET requests
+- [x] Message Server per channel (rate-limited to 1 message per second per channel).
