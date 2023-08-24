@@ -6,18 +6,18 @@ defmodule Slack.Bot do
   @type t :: %__MODULE__{
           bot_id: String.t(),
           bot_module: module(),
-          team: String.t(),
           team_id: String.t(),
           user_id: String.t()
         }
 
-  @enforce_keys [:bot_id, :bot_module, :team, :team_id, :user_id]
-  defstruct [:bot_id, :bot_module, :team, :team_id, :user_id]
+  @enforce_keys [:bot_id, :bot_module, :team_id, :user_id]
+  defstruct [:bot_id, :bot_module, :team_id, :user_id]
 
   @doc """
   Handle the event from Slack.
+  Return value is ignored.
   """
-  @callback handle_event(type :: String.t(), payload :: map()) :: :ok
+  @callback handle_event(type :: String.t(), payload :: map()) :: any()
 
   defmacro __using__(_opts) do
     quote do
@@ -32,7 +32,6 @@ defmodule Slack.Bot do
     %__MODULE__{
       bot_id: Map.fetch!(params, "bot_id"),
       bot_module: bot_module,
-      team: Map.fetch!(params, "team"),
       team_id: Map.fetch!(params, "team_id"),
       user_id: Map.fetch!(params, "user_id")
     }

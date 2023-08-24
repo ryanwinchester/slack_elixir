@@ -4,8 +4,9 @@ defmodule Slack.MixProject do
   def project do
     [
       app: :slack_elixir,
-      version: "0.1.1",
+      version: "1.0.0-rc.1",
       elixir: "~> 1.14",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: [plt_file: {:no_warn, "priv/plts/project.plt"}],
@@ -22,6 +23,10 @@ defmodule Slack.MixProject do
       extra_applications: [:logger]
     ]
   end
+
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
