@@ -1,7 +1,6 @@
 defmodule Slack.Socket do
-  @moduledoc """
-  Slack websocket connection for "Socket Mode."
-  """
+  @moduledoc false
+  # Slack websocket connection for "Socket Mode."
   use WebSockex
 
   require Logger

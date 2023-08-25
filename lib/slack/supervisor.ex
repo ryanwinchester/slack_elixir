@@ -1,12 +1,16 @@
 defmodule Slack.Supervisor do
   @moduledoc """
-  Supervisor that starts the Socket.
-  (And potentially an API genserver, if we need to rate-limit ourselves).
+  Supervisor that starts the stuff that needs to run.
   """
   use Supervisor
 
   require Logger
 
+  @doc """
+  Start the Slack bot supervisor.
+  See `README` for instructions.
+  """
+  @spec start_link(config :: keyword()) :: Supervisor.on_start()
   def start_link(bot_config) do
     Supervisor.start_link(__MODULE__, bot_config)
   end

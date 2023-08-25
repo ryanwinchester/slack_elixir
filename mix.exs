@@ -1,19 +1,23 @@
 defmodule Slack.MixProject do
   use Mix.Project
 
+  @version "1.0.0"
+  @source_url "https://github.com/ryanwinchester/slack_elixir"
+
   def project do
     [
       app: :slack_elixir,
-      version: "1.0.0-rc.1",
+      version: @version,
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: [plt_file: {:no_warn, "priv/plts/project.plt"}],
       description: description(),
+      docs: docs(),
       package: package(),
       name: "Slack Elixir",
-      source_url: "https://github.com/ryanwinchester/slack_elixir"
+      source_url: @source_url
     ]
   end
 
@@ -46,8 +50,21 @@ defmodule Slack.MixProject do
 
   defp package do
     [
+      maintainers: ["Ryan Winchester"],
       licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/ryanwinchester/slack_elixir"}
+      links: %{"GitHub" => @source_url}
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      source_url: @source_url,
+      source_ref: "v#{@version}",
+      api_reference: false,
+      extras: [
+        "README.md"
+      ]
     ]
   end
 end
