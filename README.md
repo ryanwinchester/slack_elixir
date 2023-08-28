@@ -7,11 +7,24 @@
 
 This is for creating Slack applications or bots in Elixir.
 
-To listen for subscribed events, it uses **Socket Mode** to connect to Slack, which has some restrictions, so
-please read up on that.
+### Why?
 
-It's a relatively thin wrapper, which keeps it flexible and easy to maintain, but
-it does mean there are less conveniences than a full bot/app framework/SDK.
+The existing libraries I was looking at use the deprecated RTM API, and no longer work with
+new apps or bots.
+
+### What?
+
+To listen for subscribed events, it uses [**Socket Mode**](https://api.slack.com/apis/connections/socket) to connect to Slack.
+It has some pros and cons, so please [read up on it](https://api.slack.com/apis/connections/socket) (and pay attention to the info blocks).
+
+It's a relatively thin wrapper, which keeps it flexible and easy to maintain.
+
+### How
+
+ - connects to Slack using a websocket connection to listen for your event subscriptions.
+ - uses the [Web API](https://api.slack.com/web) to send messages, etc.
+ - uses dynamically supervised gen servers to handle each channel's message rate-limiting with a message queue
+   per channel.
 
 ## Installation
 
@@ -51,6 +64,8 @@ need to add more scopes and subscriptions depending on what you want to do.
  - `message.channels`
  - `member_joined_channel`
  - `channel_left`
+
+## Usage
 
 Write the Bot module:
   
