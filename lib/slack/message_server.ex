@@ -103,7 +103,7 @@ defmodule Slack.MessageServer do
   end
 
   defp send_message(token, channel, message) do
-    send_message(token, Enum.into(message, %{channel: channel}, message))
+    send_message(token, Enum.into(message, %{channel: channel}))
   end
 
   defp send_message(token, %{} = args) do
