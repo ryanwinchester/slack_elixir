@@ -33,7 +33,7 @@ Add `slack_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:slack_elixir, "~> 1.0.0"}
+    {:slack_elixir, "~> 1.0.1"}
   ]
 end
 ```
@@ -68,7 +68,7 @@ need to add more scopes and subscriptions depending on what you want to do.
 ## Usage
 
 Write the Bot module:
-  
+
 ```elixir
 defmodule MyApp.Slackbot do
   use Slack.Bot
