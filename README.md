@@ -109,22 +109,23 @@ For example:
 
 ```elixir
   def start(_type, _args) do
-    # Often, you'd fetch this from application env,
-    # set in `config/runtime.exs`, instead of like this.
-    config = [
-      app_token: "MY_SLACK_APP_TOKEN",
-      bot_token: "MY_SLACK_BOT_TOKEN",
-      bot: MyApp.SlackBot
-    ]
-
     children = [
       # ...
-      {Slack.Supervisor, config}
+      {Slack.Supervisor, Application.fetch_env!(:my_app, MyApp.SlackBot)}
     ]
 
     opts = [strategy: :one_for_one, name: MyApp.Supervisor]
     Supervisor.start_link(children, opts)
   end
+```
+
+```elixir
+# config/runtime.exs
+
+config :my_app, MyApp.SlackBot,
+  app_token: "MY_SLACK_APP_TOKEN",
+  bot_token: "MY_SLACK_BOT_TOKEN",
+  bot: MyApp.SlackBot
 ```
 
 ## Journey to v1.0 (Things that may or may not be added)
