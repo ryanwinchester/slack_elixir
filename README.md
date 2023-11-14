@@ -77,8 +77,8 @@ defmodule MyApp.Slackbot do
 
   @impl true
   # A silly example of old-school style bot commands.
-  def handle_event("message", %{"text" => "!" <> command, "channel" => channel, "user" => user}) do
-    case command do
+  def handle_event("message", %{"text" => "!" <> cmd, "channel" => channel, "user" => user}) do
+    case cmd do
       "roll" ->
         send_message(channel, "<@#{user}> rolled a #{Enum.random(1..6)}")
 
@@ -86,7 +86,7 @@ defmodule MyApp.Slackbot do
         send_message(channel, text)
 
       _ ->
-        send_message(channel, "Unknown command: #{command}")
+        send_message(channel, "Unknown command: #{cmd}")
     end
   end
 
