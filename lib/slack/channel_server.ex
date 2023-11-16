@@ -4,6 +4,12 @@ defmodule Slack.ChannelServer do
 
   require Logger
 
+  # By default the bot will join all conversations that it has access to.
+  # For type options, see: [api](https://api.slack.com/methods/users.conversations).
+  # Note, these require the following scopes:
+  #   `channels:read`, `groups:read`, `im:read`, `mpim:read`
+  @default_channel_types "public_channel,private_channel,mpim,im"
+
   # This is fairly arbitrary, but we'll hibernate this process after 5 minutes
   # of waiting for any incoming messages.
   @hibernate_ms :timer.minutes(5)
@@ -12,10 +18,20 @@ defmodule Slack.ChannelServer do
   # Public API
   # ----------------------------------------------------------------------------
 
-  def start_link({token, bot}) do
+  def start_link({token, bot, config}) do
     Logger.info("[Slack.ChannelServer] starting for #{bot.bot_module}...")
 
-    GenServer.start_link(__MODULE__, {token, bot},
+    # This should be a comma-separated string.
+    channel_types =
+      case Keyword.get(config, :types) do
+        nil -> @default_channel_types
+        types when is_binary(types) -> types
+        types when is_list(types) -> Enum.join(types, ",")
+      end
+
+    channels = fetch_channels(token, channel_types)
+
+    GenServer.start_link(__MODULE__, {token, bot, channels},
       hibernate_after: @hibernate_ms,
       name: via_tuple(bot)
     )
@@ -34,10 +50,10 @@ defmodule Slack.ChannelServer do
   # ----------------------------------------------------------------------------
 
   @impl true
-  def init({token, bot}) do
+  def init({token, bot, channels}) do
     state = %{
       bot: bot,
-      channels: fetch_channels(token),
+      channels: channels,
       token: token
     }
 
@@ -67,9 +83,9 @@ defmodule Slack.ChannelServer do
     {:via, Registry, {Slack.ChannelServerRegistry, bot}}
   end
 
-  defp fetch_channels(token) do
+  defp fetch_channels(token, types) when is_binary(types) do
     "users.conversations"
-    |> Slack.API.stream(token, "channels")
+    |> Slack.API.stream(token, "channels", types: types)
     |> Enum.map(& &1["id"])
   end
 end

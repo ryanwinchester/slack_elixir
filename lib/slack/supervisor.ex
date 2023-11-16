@@ -17,9 +17,11 @@ defmodule Slack.Supervisor do
 
   @impl true
   def init(bot_config) do
-    app_token = Keyword.fetch!(bot_config, :app_token)
-    bot_token = Keyword.fetch!(bot_config, :bot_token)
-    bot_module = Keyword.fetch!(bot_config, :bot)
+    {app_token, bot_config} = Keyword.pop!(bot_config, :app_token)
+    {bot_token, bot_config} = Keyword.pop!(bot_config, :bot_token)
+    {bot_module, bot_config} = Keyword.pop!(bot_config, :bot)
+    {channel_config, _bot_config} = Keyword.pop(bot_config, :channels, [])
+
     bot = fetch_identity!(bot_token, bot_module)
 
     children = [
@@ -27,7 +29,7 @@ defmodule Slack.Supervisor do
       {Registry, keys: :unique, name: Slack.MessageServerRegistry},
       {DynamicSupervisor, strategy: :one_for_one, name: Slack.DynamicSupervisor},
       {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
-      {Slack.ChannelServer, {bot_token, bot}},
+      {Slack.ChannelServer, {bot_token, bot, channel_config}},
       {Slack.Socket, {app_token, bot_token, bot}}
     ]
 
