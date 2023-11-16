@@ -125,7 +125,11 @@ For example:
 config :my_app, MyApp.SlackBot,
   app_token: "MY_SLACK_APP_TOKEN",
   bot_token: "MY_SLACK_BOT_TOKEN",
-  bot: MyApp.SlackBot
+  bot: MyApp.SlackBot,
+# add this if you want to access channels other than public
+  channels: [
+    types: ["public_channel", "im", "private_channel"]
+  ]
 ```
 
 ## Journey to v1.0 (Things that may or may not be added)
