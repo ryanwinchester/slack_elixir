@@ -57,8 +57,8 @@ need to add more scopes and subscriptions depending on what you want to do.
  - `channels:history`
  - `channels:read`
  - `groups:read`
- - `mpim:read`
  - `im:read`
+ - `mpim:read`
 
 #### Required Bot Event Subscriptions
  - `message.channels`

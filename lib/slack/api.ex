@@ -70,9 +70,14 @@ defmodule Slack.API do
   """
   @spec stream(String.t(), String.t(), String.t(), map() | keyword()) :: Enumerable.t()
   def stream(endpoint, token, resource, args \\ %{}) do
+    {starting_cursor, args} =
+      args
+      |> Map.new()
+      |> Map.pop(:next_cursor, nil)
+
     Stream.resource(
       # start_fun
-      fn -> nil end,
+      fn -> starting_cursor end,
 
       # next_fun
       fn
@@ -80,7 +85,7 @@ defmodule Slack.API do
           {:halt, nil}
 
         cursor ->
-          case get(endpoint, token, Enum.into(%{next_cursor: cursor}, args)) do
+          case get(endpoint, token, Map.merge(args, %{next_cursor: cursor})) do
             {:ok, %{"ok" => true, ^resource => data} = body} ->
               cursor = get_in(body, ["response_metadata", "next_cursor"]) || ""
               {data, cursor}
