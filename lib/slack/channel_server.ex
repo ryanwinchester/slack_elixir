@@ -13,7 +13,7 @@ defmodule Slack.ChannelServer do
   # ----------------------------------------------------------------------------
 
   def start_link({token, bot}) do
-    Logger.info("[ChannelServer] starting for #{bot.bot_module}...")
+    Logger.info("[Slack.ChannelServer] starting for #{bot.bot_module}...")
 
     GenServer.start_link(__MODULE__, {token, bot},
       hibernate_after: @hibernate_ms,
@@ -52,13 +52,13 @@ defmodule Slack.ChannelServer do
 
   @impl true
   def handle_cast({:join, channel}, state) do
-    Logger.info("[ChannelServer] #{state.bot.bot_module} joining #{channel}...")
+    Logger.info("[Slack.ChannelServer] #{state.bot.bot_module} joining #{channel}...")
     {:ok, _} = Slack.MessageServer.start_supervised(state.token, state.bot, channel)
     {:noreply, Map.update!(state, :channels, &[channel | &1])}
   end
 
   def handle_cast({:part, channel}, state) do
-    Logger.info("[ChannelServer] #{state.bot.bot_module} leaving #{channel}...")
+    Logger.info("[Slack.ChannelServer] #{state.bot.bot_module} leaving #{channel}...")
     :ok = Slack.MessageServer.stop(state.bot, channel)
     {:noreply, Map.update!(state, :channels, &List.delete(&1, channel))}
   end

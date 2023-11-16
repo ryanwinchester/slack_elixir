@@ -16,7 +16,7 @@ defmodule Slack.MessageServer do
   # ----------------------------------------------------------------------------
 
   def start_link({token, bot, channel}) do
-    Logger.info("[MessageServer] starting for #{bot.bot_module} in #{channel}...")
+    Logger.info("[Slack.MessageServer] starting for #{bot.bot_module} in #{channel}...")
 
     GenServer.start_link(__MODULE__, {token, bot, channel},
       hibernate_after: @hibernate_ms,
@@ -59,7 +59,7 @@ defmodule Slack.MessageServer do
   @impl true
   # If we are paused, we will add it to the queue and start scheduling messages.
   def handle_cast({:add, message}, %{timer_ref: nil} = state) do
-    Logger.debug("[MessageServer] Adding message #{inspect(message)}")
+    Logger.debug("[Slack.MessageServer] Adding message #{inspect(message)}")
     state = send_and_schedule_next(%{state | queue: :queue.in(message, state.queue)})
     {:noreply, state}
   end
@@ -67,7 +67,7 @@ defmodule Slack.MessageServer do
   # It is not paused, so that means we are still scheduling messages, so we will
   # just add the message to queue.
   def handle_cast({:add, message}, state) do
-    Logger.debug("[MessageServer] Adding message #{inspect(message)}")
+    Logger.debug("[Slack.MessageServer] Adding message #{inspect(message)}")
     state = %{state | queue: :queue.in(message, state.queue)}
     {:noreply, state}
   end
@@ -84,11 +84,11 @@ defmodule Slack.MessageServer do
   defp send_and_schedule_next(state) do
     case :queue.out(state.queue) do
       {:empty, _} ->
-        Logger.debug("[MessageServer] [#{state.channel}] no more messages to send: PAUSED")
+        Logger.debug("[Slack.MessageServer] [#{state.channel}] no more messages to send: PAUSED")
         %{state | timer_ref: nil}
 
       {{:value, message}, rest} ->
-        Logger.debug("[MessageServer] Sending next message: #{inspect(message)}")
+        Logger.debug("[Slack.MessageServer] Sending next message: #{inspect(message)}")
         send_message(state.token, state.channel, message)
         %{state | queue: rest, timer_ref: schedule_next()}
     end
@@ -109,10 +109,10 @@ defmodule Slack.MessageServer do
   defp send_message(token, %{} = args) do
     case Slack.API.post("chat.postMessage", token, args) do
       {:ok, _} ->
-        Logger.debug("[MessageServer] SENT: #{inspect(args)}")
+        Logger.debug("[Slack.MessageServer] SENT: #{inspect(args)}")
 
       {:error, error} ->
-        Logger.error("[MessageServer] error sending message #{inspect(error)}")
+        Logger.error("[Slack.MessageServer] error sending message #{inspect(error)}")
     end
   end
 
