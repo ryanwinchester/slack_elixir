@@ -37,7 +37,7 @@ defmodule Slack.MixProject do
     [
       # Direct dependencies.
       {:jason, "~> 1.4"},
-      {:req, "~> 0.3.0"},
+      {:req, "~> 0.3"},
       {:websockex, "~> 0.4.3"},
 
       # Dev/test dependencies.
