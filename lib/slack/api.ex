@@ -12,11 +12,7 @@ defmodule Slack.API do
   """
   @spec client(String.t()) :: Req.Request.t()
   def client(token) do
-    headers = [
-      {"authorization", "Bearer #{token}"}
-    ]
-
-    Req.new(base_url: @base_url, headers: headers)
+    Req.new(base_url: @base_url, auth: {:bearer, token})
   end
 
   @doc """
