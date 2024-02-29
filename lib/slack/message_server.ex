@@ -4,10 +4,6 @@ defmodule Slack.MessageServer do
 
   require Logger
 
-  # This is fairly arbitrary, but we'll hibernate this process after 5 minutes
-  # of waiting for any incoming messages.
-  @hibernate_ms :timer.minutes(5)
-
   # Slack has a rate-limit of 1 message per second per channel.
   @message_rate_ms :timer.seconds(1)
 
@@ -17,11 +13,7 @@ defmodule Slack.MessageServer do
 
   def start_link({token, bot, channel}) do
     Logger.info("[Slack.MessageServer] starting for #{bot.bot_module} in #{channel}...")
-
-    GenServer.start_link(__MODULE__, {token, bot, channel},
-      hibernate_after: @hibernate_ms,
-      name: via_tuple(bot, channel)
-    )
+    GenServer.start_link(__MODULE__, {token, bot, channel}, name: via_tuple(bot, channel))
   end
 
   def start_supervised(token, bot, channel) do

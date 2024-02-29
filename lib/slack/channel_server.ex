@@ -10,10 +10,6 @@ defmodule Slack.ChannelServer do
   #   `channels:read`, `groups:read`, `im:read`, `mpim:read`
   @default_channel_types "public_channel,private_channel,mpim,im"
 
-  # This is fairly arbitrary, but we'll hibernate this process after 5 minutes
-  # of waiting for any incoming messages.
-  @hibernate_ms :timer.minutes(5)
-
   # ----------------------------------------------------------------------------
   # Public API
   # ----------------------------------------------------------------------------
@@ -31,10 +27,7 @@ defmodule Slack.ChannelServer do
 
     channels = fetch_channels(token, channel_types)
 
-    GenServer.start_link(__MODULE__, {token, bot, channels},
-      hibernate_after: @hibernate_ms,
-      name: via_tuple(bot)
-    )
+    GenServer.start_link(__MODULE__, {token, bot, channels}, name: via_tuple(bot))
   end
 
   def join(bot, channel) do
