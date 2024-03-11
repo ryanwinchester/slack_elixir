@@ -33,7 +33,7 @@ Add `slack_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:slack_elixir, "~> 1.1.0"}
+    {:slack_elixir, "~> 1.1.1"}
   ]
 end
 ```
