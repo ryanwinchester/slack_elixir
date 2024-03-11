@@ -67,6 +67,7 @@ defmodule Slack.SocketTest do
   test "socket can handle a slash command" do
     stub(Slack.API)
 
-    assert {:reply, {:text, ~S({"envelope_id":"eid-567"})}, %{}} = Slack.Socket.handle_frame({:text, @slash_command}, %{})
+    assert {:reply, {:text, ~S({"envelope_id":"eid-567"})}, %{}} =
+             Slack.Socket.handle_frame({:text, @slash_command}, %{})
   end
 end
