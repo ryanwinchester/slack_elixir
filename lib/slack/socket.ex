@@ -44,6 +44,16 @@ defmodule Slack.Socket do
 
         {:reply, ack_frame(msg), state}
 
+      {:ok, %{"type" => "slash_commands", "payload" => payload} = msg} ->
+        Logger.debug("[Slack.Socket] message: #{inspect(msg)}")
+
+        Task.Supervisor.start_child(
+          {:via, PartitionSupervisor, {Slack.TaskSupervisors, self()}},
+          fn -> handle_slack_event(msg["type"], payload, state.bot) end
+        )
+
+        {:reply, ack_frame(msg), state}
+
       _ ->
         Logger.debug("[Slack.Socket] Unhandled payload: #{msg}")
         {:ok, state}
