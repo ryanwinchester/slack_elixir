@@ -17,6 +17,18 @@ defmodule Slack.SocketTest do
   }
   """
 
+  @slash_command """
+  {
+    "envelope_id": "eid-567",
+    "type": "slash_commands",
+    "payload": {
+      "channel_name": "directmessage",
+      "command": "/mycmd",
+      "text": "run this"
+    }
+  }
+  """
+
   @bot %Slack.Bot{
     bot_id: "bot-123-ABC",
     bot_module: TestBot,
@@ -50,5 +62,11 @@ defmodule Slack.SocketTest do
     stub(Slack.API)
 
     assert {:ok, %{}} == Slack.Socket.handle_frame({:text, ""}, %{})
+  end
+
+  test "socket can handle a slash command" do
+    stub(Slack.API)
+
+    assert {:reply, {:text, ~S({"envelope_id":"eid-567"})}, %{}} = Slack.Socket.handle_frame({:text, @slash_command}, %{})
   end
 end
