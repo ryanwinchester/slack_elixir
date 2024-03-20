@@ -39,7 +39,39 @@ end
 ```
 
 ## Setup
+The easiest way to get started is to [create a new Slack app](https://api.slack.com/apps) and
+use the following App Manifest to configure all the permissions that are needed:
 
+```yaml
+display_information:
+  name: YOURBOTNAME
+features:
+  bot_user:
+    display_name: YOURBOTNAME
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - channels:read
+      - groups:read
+      - im:read
+      - mpim:read
+      - chat:write
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.channels
+      - member_joined_channel
+      - channel_left
+  interactivity:
+    is_enabled: true
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
+```
+
+## Manual setup
 You will need to:
 
   - Create a Slack app for your workspace
