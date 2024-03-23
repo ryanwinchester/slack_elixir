@@ -5,17 +5,6 @@ defmodule Slack.Socket do
 
   require Logger
 
-  defmodule Context do
-    @type t :: %__MODULE__{
-            app_token: String.t(),
-            bot_token: String.t(),
-            bot: module()
-          }
-
-    @derive {Inspect, only: [:bot]}
-    defstruct [:app_token, :bot_token, :bot]
-  end
-
   # ----------------------------------------------------------------------------
   # Public API
   # ----------------------------------------------------------------------------
