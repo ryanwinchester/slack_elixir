@@ -5,11 +5,11 @@ defmodule Slack.TestBot do
   use Slack.Bot
 
   @impl Slack.Bot
-  def handle_event("message", %{"text" => text}) do
+  def handle_event("message", %{"text" => text}, _bot) do
     if String.contains?(text, "hello") do
       send_message("channel-foo", "hello back!")
     end
   end
 
-  def handle_event(_type, _payload), do: :noop
+  def handle_event(_type, _payload, _bot), do: :noop
 end

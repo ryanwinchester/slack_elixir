@@ -5,14 +5,24 @@ defmodule Slack.Socket do
 
   require Logger
 
+  defmodule Context do
+    @type t :: %__MODULE__{
+            app_token: String.t(),
+            bot_token: String.t(),
+            bot: module()
+          }
+
+    @derive {Inspect, only: [:bot]}
+    defstruct [:app_token, :bot_token, :bot]
+  end
+
   # ----------------------------------------------------------------------------
   # Public API
   # ----------------------------------------------------------------------------
 
-  def start_link({app_token, bot_token, bot}) do
+  def start_link({app_token, bot}) do
     state = %{
       app_token: app_token,
-      bot_token: bot_token,
       bot: bot
     }
 
@@ -85,7 +95,7 @@ defmodule Slack.Socket do
        ) do
     Logger.debug("[Slack.Socket] member_joined_channel")
     handle_bot_joined(event, bot)
-    bot.bot_module.handle_event(type, event)
+    bot.module.handle_event(type, event, bot)
   end
 
   # In the case the bot user has PARTED a channel, we need to handle this as a
@@ -93,7 +103,7 @@ defmodule Slack.Socket do
   defp handle_slack_event("channel_left" = type, event, bot) do
     Logger.debug("[Slack.Socket] channel_left")
     handle_parted(event, bot)
-    bot.bot_module.handle_event(type, event)
+    bot.module.handle_event(type, event, bot)
   end
 
   # Ignore messages from yourself...
@@ -102,8 +112,8 @@ defmodule Slack.Socket do
 
   # Catch-all case, fall through to bot handler only.
   defp handle_slack_event(type, event, bot) do
-    Logger.debug("[Slack.Socket] Sending #{type} event to #{bot.bot_module}")
-    bot.bot_module.handle_event(type, event)
+    Logger.debug("[Slack.Socket] Sending #{type} event to #{bot.module}")
+    bot.module.handle_event(type, event, bot)
   end
 
   defp handle_bot_joined(%{"channel" => channel} = _event, bot) do

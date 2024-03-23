@@ -24,8 +24,8 @@ defmodule Slack.BotTest do
       :ok
     end)
 
-    TestBot.handle_event("message", message_event("hello there."))
-    TestBot.handle_event("message", message_event("No way, José!"))
+    TestBot.handle_event("message", message_event("hello there."), %{})
+    TestBot.handle_event("message", message_event("No way, José!"), %{})
   end
 
   test "fallbacks" do
@@ -34,6 +34,6 @@ defmodule Slack.BotTest do
       raise "failed test"
     end)
 
-    assert :noop = TestBot.handle_event("foo", message_event("No way, José!"))
+    assert :noop = TestBot.handle_event("foo", message_event("No way, José!"), %{})
   end
 end

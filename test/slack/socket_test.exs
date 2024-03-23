@@ -30,8 +30,9 @@ defmodule Slack.SocketTest do
   """
 
   @bot %Slack.Bot{
-    bot_id: "bot-123-ABC",
-    bot_module: TestBot,
+    id: "bot-123-ABC",
+    module: TestBot,
+    token: "bot-123-ABC",
     team_id: "team-123-ABC",
     user_id: "user-123-ABC"
   }

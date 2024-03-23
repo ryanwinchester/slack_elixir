@@ -29,17 +29,17 @@ defmodule Slack.Supervisor do
       {Registry, keys: :unique, name: Slack.MessageServerRegistry},
       {DynamicSupervisor, strategy: :one_for_one, name: Slack.DynamicSupervisor},
       {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
-      {Slack.ChannelServer, {bot_token, bot, channel_config}},
-      {Slack.Socket, {app_token, bot_token, bot}}
+      {Slack.ChannelServer, {bot, channel_config}},
+      {Slack.Socket, {app_token, bot}}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  defp fetch_identity!(token, bot_module) do
-    case Slack.API.get("auth.test", token) do
+  defp fetch_identity!(bot_token, bot_module) do
+    case Slack.API.get("auth.test", bot_token) do
       {:ok, %{"ok" => true, "bot_id" => _} = body} ->
-        Slack.Bot.from_string_params(bot_module, body)
+        Slack.Bot.from_string_params(bot_module, bot_token, body)
 
       {_, result} ->
         Logger.error("[Slack.Supervisor] Error fetching user ID: #{inspect(result)}")

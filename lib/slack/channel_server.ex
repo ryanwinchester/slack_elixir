@@ -14,8 +14,8 @@ defmodule Slack.ChannelServer do
   # Public API
   # ----------------------------------------------------------------------------
 
-  def start_link({token, bot, config}) do
-    Logger.info("[Slack.ChannelServer] starting for #{bot.bot_module}...")
+  def start_link({bot, config}) do
+    Logger.info("[Slack.ChannelServer] starting for #{bot.module}...")
 
     # This should be a comma-separated string.
     channel_types =
@@ -25,9 +25,9 @@ defmodule Slack.ChannelServer do
         types when is_list(types) -> Enum.join(types, ",")
       end
 
-    channels = fetch_channels(token, channel_types)
+    channels = fetch_channels(bot.token, channel_types)
 
-    GenServer.start_link(__MODULE__, {token, bot, channels}, name: via_tuple(bot))
+    GenServer.start_link(__MODULE__, {bot, channels}, name: via_tuple(bot))
   end
 
   def join(bot, channel) do
@@ -43,11 +43,10 @@ defmodule Slack.ChannelServer do
   # ----------------------------------------------------------------------------
 
   @impl true
-  def init({token, bot, channels}) do
+  def init({bot, channels}) do
     state = %{
       bot: bot,
-      channels: channels,
-      token: token
+      channels: channels
     }
 
     {:ok, state, {:continue, :join}}
@@ -61,18 +60,18 @@ defmodule Slack.ChannelServer do
 
   @impl true
   def handle_cast({:join, channel}, state) do
-    Logger.info("[Slack.ChannelServer] #{state.bot.bot_module} joining #{channel}...")
-    {:ok, _} = Slack.MessageServer.start_supervised(state.token, state.bot, channel)
+    Logger.info("[Slack.ChannelServer] #{state.bot.module} joining #{channel}...")
+    {:ok, _} = Slack.MessageServer.start_supervised(state.bot, channel)
     {:noreply, Map.update!(state, :channels, &[channel | &1])}
   end
 
   def handle_cast({:part, channel}, state) do
-    Logger.info("[Slack.ChannelServer] #{state.bot.bot_module} leaving #{channel}...")
+    Logger.info("[Slack.ChannelServer] #{state.bot.module} leaving #{channel}...")
     :ok = Slack.MessageServer.stop(state.bot, channel)
     {:noreply, Map.update!(state, :channels, &List.delete(&1, channel))}
   end
 
-  defp via_tuple(%Slack.Bot{bot_module: bot}) do
+  defp via_tuple(%Slack.Bot{module: bot}) do
     {:via, Registry, {Slack.ChannelServerRegistry, bot}}
   end
 

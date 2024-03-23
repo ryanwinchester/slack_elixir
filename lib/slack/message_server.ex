@@ -11,15 +11,15 @@ defmodule Slack.MessageServer do
   # Public API
   # ----------------------------------------------------------------------------
 
-  def start_link({token, bot, channel}) do
-    Logger.info("[Slack.MessageServer] starting for #{bot.bot_module} in #{channel}...")
-    GenServer.start_link(__MODULE__, {token, bot, channel}, name: via_tuple(bot, channel))
+  def start_link({bot, channel}) do
+    Logger.info("[Slack.MessageServer] starting for #{bot.module} in #{channel}...")
+    GenServer.start_link(__MODULE__, {bot, channel}, name: via_tuple(bot, channel))
   end
 
-  def start_supervised(token, bot, channel) do
+  def start_supervised(bot, channel) do
     DynamicSupervisor.start_child(
       Slack.DynamicSupervisor,
-      {Slack.MessageServer, {token, bot, channel}}
+      {Slack.MessageServer, {bot, channel}}
     )
   end
 
@@ -36,13 +36,12 @@ defmodule Slack.MessageServer do
   # ----------------------------------------------------------------------------
 
   @impl true
-  def init({token, bot, channel}) do
+  def init({bot, channel}) do
     state = %{
       bot: bot,
       channel: channel,
       queue: :queue.new(),
-      timer_ref: schedule_next(),
-      token: token
+      timer_ref: schedule_next()
     }
 
     {:ok, state}
@@ -81,7 +80,7 @@ defmodule Slack.MessageServer do
 
       {{:value, message}, rest} ->
         Logger.debug("[Slack.MessageServer] Sending next message: #{inspect(message)}")
-        send_message(state.token, state.channel, message)
+        send_message(state.bot.token, state.channel, message)
         %{state | queue: rest, timer_ref: schedule_next()}
     end
   end
@@ -112,7 +111,7 @@ defmodule Slack.MessageServer do
     Process.send_after(self(), :send, after_ms)
   end
 
-  defp via_tuple(%Slack.Bot{bot_module: bot}, channel) do
+  defp via_tuple(%Slack.Bot{module: bot}, channel) do
     via_tuple(bot, channel)
   end
 

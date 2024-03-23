@@ -4,20 +4,22 @@ defmodule Slack.Bot do
   """
 
   @type t :: %__MODULE__{
-          bot_id: String.t(),
-          bot_module: module(),
+          id: String.t(),
+          module: module(),
           team_id: String.t(),
+          token: String.t(),
           user_id: String.t()
         }
 
-  @enforce_keys [:bot_id, :bot_module, :team_id, :user_id]
-  defstruct [:bot_id, :bot_module, :team_id, :user_id]
+  @derive {Inspect, except: [:token]}
+  @enforce_keys [:id, :module, :token, :team_id, :user_id]
+  defstruct [:id, :module, :token, :team_id, :user_id]
 
   @doc """
   Handle the event from Slack.
   Return value is ignored.
   """
-  @callback handle_event(type :: String.t(), payload :: map()) :: any()
+  @callback handle_event(type :: String.t(), payload :: map(), t()) :: any()
 
   defmacro __using__(_opts) do
     quote do
@@ -28,11 +30,12 @@ defmodule Slack.Bot do
 
   # Build a Bot struct from a string-keyed map.
   @doc false
-  def from_string_params(bot_module, params) do
+  def from_string_params(bot_module, bot_token, params) do
     %__MODULE__{
-      bot_id: Map.fetch!(params, "bot_id"),
-      bot_module: bot_module,
+      id: Map.fetch!(params, "bot_id"),
+      module: bot_module,
       team_id: Map.fetch!(params, "team_id"),
+      token: bot_token,
       user_id: Map.fetch!(params, "user_id")
     }
   end

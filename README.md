@@ -33,7 +33,7 @@ Add `slack_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:slack_elixir, "~> 1.1.1"}
+    {:slack_elixir, "~> 1.2.0"}
   ]
 end
 ```
@@ -77,7 +77,7 @@ defmodule MyApp.Slackbot do
 
   @impl true
   # A silly example of old-school style bot commands.
-  def handle_event("message", %{"text" => "!" <> cmd, "channel" => channel, "user" => user}) do
+  def handle_event("message", %{"text" => "!" <> cmd, "channel" => channel, "user" => user}, _bot) do
     case cmd do
       "roll" ->
         send_message(channel, "<@#{user}> rolled a #{Enum.random(1..6)}")
@@ -90,13 +90,13 @@ defmodule MyApp.Slackbot do
     end
   end
 
-  def handle_event("message", %{"channel" => channel, "text" => text, "user" => user}) do
+  def handle_event("message", %{"channel" => channel, "text" => text, "user" => user}, _bot) do
     if String.match?(text, ~r/hello/i) do
       send_message(channel, "Hello! <@#{user}>")
     end
   end
 
-  def handle_event(type, payload) do
+  def handle_event(type, payload, _bot) do
     Logger.debug("Unhandled #{type} event: #{inspect(payload)}")
     :ok
   end
