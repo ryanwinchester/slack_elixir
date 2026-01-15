@@ -17,12 +17,17 @@ defmodule Slack.Supervisor do
 
   @impl true
   def init(bot_config) do
-    {app_token, bot_config} = Keyword.pop!(bot_config, :app_token)
-    {bot_token, bot_config} = Keyword.pop!(bot_config, :bot_token)
-    {bot_module, bot_config} = Keyword.pop!(bot_config, :bot)
-    {channel_config, _bot_config} = Keyword.pop(bot_config, :channels, [])
+    app_token = Keyword.fetch!(bot_config, :app_token)
+    bot = case Keyword.fetch(bot_config, :bot_config) do
+      {:ok, bot} -> bot
+      _ ->
+        bot_token = Keyword.fetch!(bot_config, :bot_token)
+        bot_module = Keyword.fetch!(bot_config, :bot)
+        {:ok, bot} = fetch_identity(bot_module, bot_token)
+        bot
+    end
 
-    bot = fetch_identity!(bot_token, bot_module)
+    {channel_config, bot_config} = Keyword.pop(bot_config, :channels, [])
 
     children = [
       {Registry, keys: :unique, name: Slack.ChannelServerRegistry},
@@ -30,20 +35,20 @@ defmodule Slack.Supervisor do
       {DynamicSupervisor, strategy: :one_for_one, name: Slack.DynamicSupervisor},
       {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
       {Slack.ChannelServer, {bot, channel_config}},
-      {Slack.Socket, {app_token, bot}}
+      {Slack.Socket, bot_config}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  defp fetch_identity!(bot_token, bot_module) do
+  def fetch_identity(bot_module, bot_token) do
     case Slack.API.get("auth.test", bot_token) do
       {:ok, %{"ok" => true, "bot_id" => _} = body} ->
-        Slack.Bot.from_string_params(bot_module, bot_token, body)
+        {:ok, Slack.Bot.from_string_params(bot_module, bot_token, body)}
 
       {_, result} ->
         Logger.error("[Slack.Supervisor] Error fetching user ID: #{inspect(result)}")
-        raise "Unable to fetch bot user ID"
+        {:error, "Error fetching Slack user ID: #{inspect(result)}"}
     end
   end
 end

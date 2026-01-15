@@ -9,7 +9,10 @@ defmodule Slack.Socket do
   # Public API
   # ----------------------------------------------------------------------------
 
-  def start_link({app_token, bot}) do
+  def start_link(bot_config) do
+    app_token = Keyword.fetch!(bot_config, :app_token)
+    bot = Keyword.fetch!(bot_config, :bot) # eventually add proxy configuration when websockex supports it.
+
     state = %{
       app_token: app_token,
       bot: bot
