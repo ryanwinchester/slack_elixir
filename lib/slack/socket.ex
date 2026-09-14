@@ -1,12 +1,6 @@
 defmodule Slack.Socket do
   @moduledoc false
   # Slack websocket connection for "Socket Mode."
-  #
-  # Liveness: Slack normally retires a Socket Mode connection with a close
-  # frame, which ends this process and lets the supervisor open a fresh one.
-  # A connection that dies silently (no close frame, no TCP reset) would leave
-  # this process waiting forever, so every `ping_interval` we send a ping and
-  # close the connection if nothing at all arrived since the previous tick.
   use WebSockex
 
   require Logger
@@ -114,6 +108,11 @@ defmodule Slack.Socket do
   # Helpers
   # ----------------------------------------------------------------------------
 
+  # Liveness: Slack normally retires a Socket Mode connection with a close
+  # frame, which ends this process and lets the supervisor open a fresh one.
+  # A connection that dies silently (no close frame, no TCP reset) would leave
+  # this process waiting forever, so every `ping_interval` we send a ping and
+  # close the connection if nothing at all arrived since the previous tick.
   defp schedule_ping(%{ping_interval: interval}) do
     Process.send_after(self(), :ping_tick, interval)
   end
