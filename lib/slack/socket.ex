@@ -1,9 +1,17 @@
 defmodule Slack.Socket do
   @moduledoc false
   # Slack websocket connection for "Socket Mode."
+  #
+  # Liveness: Slack normally retires a Socket Mode connection with a close
+  # frame, which ends this process and lets the supervisor open a fresh one.
+  # A connection that dies silently (no close frame, no TCP reset) would leave
+  # this process waiting forever, so every `ping_interval` we send a ping and
+  # close the connection if nothing at all arrived since the previous tick.
   use WebSockex
 
   require Logger
+
+  @ping_interval :timer.seconds(30)
 
   # ----------------------------------------------------------------------------
   # Public API
@@ -12,7 +20,9 @@ defmodule Slack.Socket do
   def start_link({app_token, bot}) do
     state = %{
       app_token: app_token,
-      bot: bot
+      bot: bot,
+      alive?: true,
+      ping_interval: @ping_interval
     }
 
     {:ok, %{"url" => url}} = Slack.API.post("apps.connections.open", state.app_token)
@@ -27,7 +37,15 @@ defmodule Slack.Socket do
   # ----------------------------------------------------------------------------
 
   @impl WebSockex
+  def handle_connect(_conn, state) do
+    schedule_ping(state)
+    {:ok, state}
+  end
+
+  @impl WebSockex
   def handle_frame({:text, msg}, state) do
+    state = mark_alive(state)
+
     case Jason.decode(msg) do
       {:ok, %{"type" => "hello"} = hello} ->
         Logger.info("[Slack.Socket] hello: #{inspect(hello)}")
@@ -62,7 +80,28 @@ defmodule Slack.Socket do
   @impl WebSockex
   def handle_frame({type, msg}, state) do
     Logger.debug("[Slack.Socket] unhandled message type: #{inspect(type)}, msg: #{inspect(msg)}")
-    {:ok, state}
+    {:ok, mark_alive(state)}
+  end
+
+  @impl WebSockex
+  def handle_ping(:ping, state), do: {:reply, :pong, mark_alive(state)}
+  def handle_ping({:ping, msg}, state), do: {:reply, {:pong, msg}, mark_alive(state)}
+
+  @impl WebSockex
+  def handle_pong(_pong, state), do: {:ok, mark_alive(state)}
+
+  @impl WebSockex
+  def handle_info(:ping_tick, %{alive?: false} = state) do
+    Logger.warning(
+      "[Slack.Socket] nothing received for #{state.ping_interval}ms, closing to reconnect"
+    )
+
+    {:close, state}
+  end
+
+  def handle_info(:ping_tick, state) do
+    schedule_ping(state)
+    {:reply, :ping, %{state | alive?: false}}
   end
 
   @impl WebSockex
@@ -74,6 +113,12 @@ defmodule Slack.Socket do
   # ----------------------------------------------------------------------------
   # Helpers
   # ----------------------------------------------------------------------------
+
+  defp schedule_ping(%{ping_interval: interval}) do
+    Process.send_after(self(), :ping_tick, interval)
+  end
+
+  defp mark_alive(state), do: %{state | alive?: true}
 
   # In the case the bot user has JOINED a channel, we need to handle this as a
   # special case.
