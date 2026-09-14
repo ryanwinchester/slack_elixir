@@ -83,6 +83,7 @@ defmodule Slack.SocketTest do
       assert_receive :ping_tick, 100
     end
 
+    @tag capture_log: true
     test "a tick closes the socket when nothing arrived since the last ping" do
       assert {:close, _state} = Slack.Socket.handle_info(:ping_tick, %{@state | alive?: false})
       refute_receive :ping_tick, 50
