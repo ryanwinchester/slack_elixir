@@ -87,8 +87,9 @@ You will need to:
   - Enable Interactivity for buttons, modals, and shortcuts (shortcuts also
     have to be created there, and need the `commands` scope)
 
-See below for some minimum required scopes and event subscriptions. You will
-need to add more scopes and subscriptions depending on what you want to do.
+The scopes and event subscriptions below support the example bot with channel
+management enabled. You can disable channel management with `channels: false`
+(see below). Add scopes and subscriptions for the features your bot uses.
 
 #### Required Bot Token scopes:
  - `channels:history`
@@ -223,6 +224,26 @@ config :my_app, MyApp.SlackBot,
   # ...
   ssl_options: [cacertfile: "/path/to/ca.pem"]
 ```
+
+To disable channel discovery and the per-channel message queues, set `channels: false`:
+
+```elixir
+config :my_app, MyApp.SlackBot,
+  app_token: "MY_SLACK_APP_TOKEN",
+  bot_token: "MY_SLACK_BOT_TOKEN",
+  bot: MyApp.SlackBot,
+  channels: false
+```
+
+This skips `users.conversations` at startup, so `channels:read`, `groups:read`,
+`im:read`, and `mpim:read` are only needed if your bot uses other features that
+require them. Socket Mode and event callbacks remain enabled, including channel
+join and leave callbacks. Omitting `channels` keeps the default behavior.
+
+With channel management disabled, use `Slack.API.post("chat.postMessage", bot.token,
+%{channel: channel_id, text: "Hello!"})` to send messages with the appropriate scopes.
+The `send_message/2` helper requires the per-channel queues and is unavailable in
+this mode. Direct API calls must handle rate limits themselves.
 
 ## Journey to v1.0 (Things that may or may not be added)
 

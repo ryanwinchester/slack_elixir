@@ -40,6 +40,7 @@ defmodule Slack.SocketTest do
   @state %{
     bot: @bot,
     app_token: "xapp-test",
+    channels?: true,
     alive?: true,
     ping_interval: 10,
     response_timeout: 100

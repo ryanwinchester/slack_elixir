@@ -25,16 +25,25 @@ defmodule Slack.Supervisor do
 
     bot = fetch_identity!(bot_token, bot_module)
 
-    children = [
+    children =
+      channel_children(bot, channel_config) ++
+        [
+          {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
+          {Slack.Socket, {app_token, bot, ssl_options, channel_config != false}}
+        ]
+
+    Supervisor.init(children, strategy: :one_for_one)
+  end
+
+  defp channel_children(_bot, false), do: []
+
+  defp channel_children(bot, channel_config) do
+    [
       {Registry, keys: :unique, name: Slack.ChannelServerRegistry},
       {Registry, keys: :unique, name: Slack.MessageServerRegistry},
       {DynamicSupervisor, strategy: :one_for_one, name: Slack.DynamicSupervisor},
-      {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
-      {Slack.ChannelServer, {bot, channel_config}},
-      {Slack.Socket, {app_token, bot, ssl_options}}
+      {Slack.ChannelServer, {bot, channel_config}}
     ]
-
-    Supervisor.init(children, strategy: :one_for_one)
   end
 
   defp fetch_identity!(bot_token, bot_module) do

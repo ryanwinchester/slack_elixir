@@ -19,9 +19,14 @@ defmodule Slack.Socket do
   # ----------------------------------------------------------------------------
 
   def start_link({app_token, bot, ssl_options}) do
+    start_link({app_token, bot, ssl_options, true})
+  end
+
+  def start_link({app_token, bot, ssl_options, channels?}) do
     state = %{
       app_token: app_token,
       bot: bot,
+      channels?: channels?,
       alive?: true,
       ping_interval: @ping_interval,
       response_timeout: @response_timeout
@@ -127,7 +132,9 @@ defmodule Slack.Socket do
          %{"type" => "events_api", "payload" => %{"event" => event}} = envelope,
          state
        ) do
-    dispatch(envelope, state, fn -> handle_slack_event(event["type"], event, state.bot) end)
+    dispatch(envelope, state, fn ->
+      handle_slack_event(event["type"], event, state.bot, state.channels?)
+    end)
   end
 
   defp handle_envelope(%{"type" => "slash_commands", "payload" => payload} = envelope, state) do
@@ -289,12 +296,15 @@ defmodule Slack.Socket do
       end
   end
 
+  defp handle_slack_event(type, event, bot, channels? \\ true)
+
   # In the case the bot user has JOINED a channel, we need to handle this as a
   # special case.
   defp handle_slack_event(
          "member_joined_channel" = type,
          %{"user" => user} = event,
-         %{user_id: user} = bot
+         %{user_id: user} = bot,
+         true
        ) do
     Logger.debug("[Slack.Socket] member_joined_channel")
     handle_bot_joined(event, bot)
@@ -303,18 +313,18 @@ defmodule Slack.Socket do
 
   # In the case the bot user has PARTED a channel, we need to handle this as a
   # special case.
-  defp handle_slack_event("channel_left" = type, event, bot) do
+  defp handle_slack_event("channel_left" = type, event, bot, true) do
     Logger.debug("[Slack.Socket] channel_left")
     handle_parted(event, bot)
     bot.module.handle_event(type, event, bot)
   end
 
   # Ignore messages from yourself...
-  defp handle_slack_event("message", %{"user" => user}, %{user_id: user}), do: :ok
-  defp handle_slack_event("message", %{"bot_id" => bot_id}, %{id: bot_id}), do: :ok
+  defp handle_slack_event("message", %{"user" => user}, %{user_id: user}, _channels?), do: :ok
+  defp handle_slack_event("message", %{"bot_id" => bot_id}, %{id: bot_id}, _channels?), do: :ok
 
   # Catch-all case, fall through to bot handler only.
-  defp handle_slack_event(type, event, bot) do
+  defp handle_slack_event(type, event, bot, _channels?) do
     Logger.debug("[Slack.Socket] Sending #{type} event to #{bot.module}")
     bot.module.handle_event(type, event, bot)
   end
