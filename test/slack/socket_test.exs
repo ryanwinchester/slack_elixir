@@ -72,6 +72,34 @@ defmodule Slack.SocketTest do
              Slack.Socket.handle_frame({:text, @slash_command}, @state)
   end
 
+  @tag capture_log: true
+  test "socket verifies TLS certificates and the server name" do
+    url = URI.to_string(%URI{scheme: "wss", host: @bot.team_id, path: "/socket"})
+    cacerts = :public_key.cacerts_get()
+
+    expect(Slack.API, :post, fn "apps.connections.open", "xapp-test" ->
+      {:ok, %{"url" => url}}
+    end)
+
+    expect(WebSockex, :start_link, fn ^url, Slack.Socket, state, options ->
+      assert state.bot == @bot
+      assert state.app_token == "xapp-test"
+      assert options[:insecure] == false
+      assert options[:cacerts] == cacerts
+      assert options[:ssl_options][:verify] == :verify_peer
+      assert options[:ssl_options][:cacerts] == cacerts
+      assert options[:ssl_options][:server_name_indication] == String.to_charlist(@bot.team_id)
+
+      assert options[:ssl_options][:customize_hostname_check][:match_fun] ==
+               :public_key.pkix_verify_hostname_match_fun(:https)
+
+      {:ok, self()}
+    end)
+
+    assert {:ok, pid} = Slack.Socket.start_link({"xapp-test", @bot})
+    assert pid == self()
+  end
+
   describe "liveness ping" do
     test "handle_connect schedules the first ping tick" do
       assert {:ok, @state} = Slack.Socket.handle_connect(:conn, @state)
