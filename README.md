@@ -65,6 +65,7 @@ settings:
       - member_joined_channel
       - channel_left
   interactivity:
+    # Deliver button actions, modal events, and shortcuts through Socket Mode.
     is_enabled: true
   org_deploy_enabled: false
   socket_mode_enabled: true
@@ -81,6 +82,7 @@ You will need to:
   - Enable Socket Mode
   - Get an app-level token with `connections:write` scope
   - Add Event Subscriptions
+  - Enable Interactivity for buttons, modals, and shortcuts
 
 See below for some minimum required scopes and event subscriptions. You will
 need to add more scopes and subscriptions depending on what you want to do.
@@ -128,12 +130,24 @@ defmodule MyApp.Slackbot do
     end
   end
 
+  def handle_event("block_actions", %{"actions" => actions}, _bot) do
+    Enum.each(actions, fn action ->
+      Logger.info("Received action: #{action["action_id"]}")
+    end)
+  end
+
   def handle_event(type, payload, _bot) do
     Logger.debug("Unhandled #{type} event: #{inspect(payload)}")
     :ok
   end
 end
 ```
+
+Interactive payloads are acknowledged automatically and dispatched to `handle_event/3`
+using the payload's type: `"block_actions"`, `"view_submission"`, `"view_closed"`,
+`"shortcut"`, or `"message_action"`. The second argument is the full interaction payload.
+Handlers run asynchronously, and their return values are ignored, so they cannot
+customize the acknowledgment with modal validation errors or other response payloads.
 
 Then you start the Slack Supervisor in your application's supervision tree.
 

@@ -66,10 +66,45 @@ defmodule Slack.SocketTest do
   end
 
   test "socket can handle a slash command" do
-    stub(Slack.API)
+    parent = self()
+    payload = Jason.decode!(@slash_command)["payload"]
+
+    expect(TestBot, :handle_event, fn "slash_commands", ^payload, @bot ->
+      send(parent, :slash_command_dispatched)
+    end)
 
     assert {:reply, {:text, ~S({"envelope_id":"eid-567"})}, @state} =
              Slack.Socket.handle_frame({:text, @slash_command}, @state)
+
+    assert_receive :slash_command_dispatched
+  end
+
+  for type <- ~w(block_actions view_submission view_closed shortcut message_action) do
+    @tag capture_log: true
+    test "acknowledges and dispatches #{type} interactions" do
+      type = unquote(type)
+      parent = self()
+      payload = %{"type" => type, "user" => %{"id" => "user-456"}}
+
+      envelope = %{
+        "envelope_id" => "eid-890",
+        "type" => "interactive",
+        "accepts_response_payload" => true,
+        "payload" => payload
+      }
+
+      expect(TestBot, :handle_event, fn ^type, ^payload, @bot ->
+        send(parent, :interaction_dispatched)
+      end)
+
+      assert {:reply, {:text, ~S({"envelope_id":"eid-890"})}, @state} =
+               Slack.Socket.handle_frame({:text, Jason.encode!(envelope)}, %{
+                 @state
+                 | alive?: false
+               })
+
+      assert_receive :interaction_dispatched
+    end
   end
 
   describe "liveness ping" do
