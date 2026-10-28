@@ -33,7 +33,7 @@ Add `slack_elixir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:slack_elixir, "~> 1.2.2"}
+    {:slack_elixir, "~> 1.3.0"}
   ]
 end
 ```
@@ -163,6 +163,25 @@ config :my_app, MyApp.SlackBot,
   channels: [
     types: ["public_channel", "im", "private_channel"]
   ]
+```
+
+### TLS
+
+The Socket Mode connection verifies Slack's certificate and hostname. It trusts
+your operating system's CA certificates (Erlang/OTP 25+). If those can't be
+loaded, for example on Alpine without `ca-certificates` or on OTP 24, it falls
+back to [CAStore](https://hex.pm/packages/castore) when that is in your
+dependencies.
+
+To change this, set `ssl_options` in your bot config. They are
+[`:ssl` client options](https://www.erlang.org/doc/apps/ssl/ssl.html#t:tls_client_option/0),
+merged over the defaults. Setting `cacerts` or `cacertfile` replaces the default
+CA certificates, for example to trust your own CA behind a TLS-inspecting proxy:
+
+```elixir
+config :my_app, MyApp.SlackBot,
+  # ...
+  ssl_options: [cacertfile: "/path/to/ca.pem"]
 ```
 
 ## Journey to v1.0 (Things that may or may not be added)

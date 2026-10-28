@@ -1,7 +1,7 @@
 defmodule Slack.MixProject do
   use Mix.Project
 
-  @version "1.2.2"
+  @version "1.3.0"
   @source_url "https://github.com/ryanwinchester/slack_elixir"
 
   def project do
@@ -39,6 +39,9 @@ defmodule Slack.MixProject do
       {:jason, "~> 1.4"},
       {:req, "~> 0.3"},
       {:websockex, "~> 0.4.3 or ~> 0.5.1"},
+
+      # Optional dependencies.
+      {:castore, "~> 1.0", optional: true},
 
       # Dev/test dependencies.
       {:ex_doc, "~> 0.27", only: :dev, runtime: false},

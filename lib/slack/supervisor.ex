@@ -20,7 +20,8 @@ defmodule Slack.Supervisor do
     {app_token, bot_config} = Keyword.pop!(bot_config, :app_token)
     {bot_token, bot_config} = Keyword.pop!(bot_config, :bot_token)
     {bot_module, bot_config} = Keyword.pop!(bot_config, :bot)
-    {channel_config, _bot_config} = Keyword.pop(bot_config, :channels, [])
+    {channel_config, bot_config} = Keyword.pop(bot_config, :channels, [])
+    {ssl_options, _bot_config} = Keyword.pop(bot_config, :ssl_options, [])
 
     bot = fetch_identity!(bot_token, bot_module)
 
@@ -30,7 +31,7 @@ defmodule Slack.Supervisor do
       {DynamicSupervisor, strategy: :one_for_one, name: Slack.DynamicSupervisor},
       {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
       {Slack.ChannelServer, {bot, channel_config}},
-      {Slack.Socket, {app_token, bot}}
+      {Slack.Socket, {app_token, bot, ssl_options}}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

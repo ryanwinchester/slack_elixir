@@ -5,13 +5,16 @@ defmodule Slack.Socket do
 
   require Logger
 
+  # CAStore is an optional dependency and `cacerts_get/0` needs OTP 25+.
+  @compile {:no_warn_undefined, [CAStore, {:public_key, :cacerts_get, 0}]}
+
   @ping_interval :timer.seconds(30)
 
   # ----------------------------------------------------------------------------
   # Public API
   # ----------------------------------------------------------------------------
 
-  def start_link({app_token, bot}) do
+  def start_link({app_token, bot, ssl_options}) do
     state = %{
       app_token: app_token,
       bot: bot,
@@ -23,20 +26,20 @@ defmodule Slack.Socket do
 
     Logger.info("[Slack.Socket] connecting...")
 
-    cacerts = :public_key.cacerts_get()
-    host = url |> URI.parse() |> Map.fetch!(:host) |> String.to_charlist()
+    # WebSockex ignores its top-level TLS options when ssl_options is given.
+    WebSockex.start_link(url, __MODULE__, state, ssl_options: ssl_options(ssl_options))
+  end
 
-    WebSockex.start_link(url, __MODULE__, state,
-      insecure: false,
-      cacerts: cacerts,
-      ssl_options: [
-        verify: :verify_peer,
-        # WebSockex uses ssl_options instead of its top-level TLS options.
-        cacerts: cacerts,
-        server_name_indication: host,
-        customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]
-      ]
-    )
+  @doc false
+  # Verify the server certificate and hostname by default. The bot config's
+  # `:ssl_options` override these key by key.
+  def ssl_options(overrides) do
+    [
+      verify: :verify_peer,
+      customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]
+    ]
+    |> Keyword.merge(overrides)
+    |> put_default_cacerts()
   end
 
   # ----------------------------------------------------------------------------
@@ -131,6 +134,37 @@ defmodule Slack.Socket do
   end
 
   defp mark_alive(state), do: %{state | alive?: true}
+
+  # Like Mint, trust the OS certificate store unless the user brought their own
+  # CAs or turned verification off, and fall back to CAStore when the OS store
+  # can't be loaded (no CA bundle installed, or OTP 24).
+  defp put_default_cacerts(opts) do
+    if opts[:verify] == :verify_none or Keyword.has_key?(opts, :cacerts) or
+         Keyword.has_key?(opts, :cacertfile) do
+      opts
+    else
+      Keyword.merge(opts, default_cacerts())
+    end
+  end
+
+  # Only the DER binaries: they are shared between processes, whereas the
+  # decoded certificates would be copied into the socket process on every
+  # connect.
+  defp default_cacerts do
+    [cacerts: for({:cert, der, _otp} <- :public_key.cacerts_get(), do: der)]
+  rescue
+    error ->
+      if Code.ensure_loaded?(CAStore) do
+        [cacertfile: CAStore.file_path()]
+      else
+        raise """
+        [Slack.Socket] could not load the OS CA certificates: #{Exception.message(error)}
+
+        Add `:castore` to your dependencies, or set `ssl_options: [cacertfile: path]` \
+        in your Slack bot config.
+        """
+      end
+  end
 
   # In the case the bot user has JOINED a channel, we need to handle this as a
   # special case.
