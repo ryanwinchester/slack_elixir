@@ -65,6 +65,9 @@ settings:
       - member_joined_channel
       - channel_left
   interactivity:
+    # Deliver button actions, modal events, and shortcuts through Socket Mode.
+    # Shortcuts also need to be declared under `features.shortcuts`, and need
+    # the `commands` bot scope.
     is_enabled: true
   org_deploy_enabled: false
   socket_mode_enabled: true
@@ -81,6 +84,8 @@ You will need to:
   - Enable Socket Mode
   - Get an app-level token with `connections:write` scope
   - Add Event Subscriptions
+  - Enable Interactivity for buttons, modals, and shortcuts (shortcuts also
+    have to be created there, and need the `commands` scope)
 
 See below for some minimum required scopes and event subscriptions. You will
 need to add more scopes and subscriptions depending on what you want to do.
@@ -132,8 +137,43 @@ defmodule MyApp.Slackbot do
     Logger.debug("Unhandled #{type} event: #{inspect(payload)}")
     :ok
   end
+
+  @impl true
+  def handle_interaction("block_actions", %{"actions" => actions}, _bot) do
+    Enum.each(actions, fn action ->
+      Logger.info("Received action: #{action["action_id"]}")
+    end)
+  end
+
+  def handle_interaction("view_submission", %{"view" => %{"callback_id" => "signup"} = view}, _bot) do
+    if get_in(view, ["state", "values", "name", "name_input", "value"]) in [nil, ""] do
+      {:reply, %{response_action: "errors", errors: %{name: "Please enter a name"}}}
+    else
+      :ok
+    end
+  end
+
+  def handle_interaction(_type, _payload, _bot), do: :ok
 end
 ```
+
+Interactions, such as button clicks, modal submissions and shortcuts, go to the
+optional `handle_interaction/3` callback with the payload's `"type"` (for example
+`"block_actions"`, `"view_submission"`, `"block_suggestion"`, `"shortcut"` or
+`"message_action"`) and the full interaction payload. Every interaction type is
+passed on. In these payloads `"user"` is a map, not an ID, and so is `"channel"`
+when there is one (modal submissions and global shortcuts have none). The default
+`handle_interaction/3` from `use Slack.Bot` acknowledges interactions and ignores
+them, so defining your own replaces it: include a catch-all clause.
+
+Most interactions are acknowledged right away and the return value is ignored.
+When Slack accepts a response, as for `"view_submission"` and `"block_suggestion"`,
+the acknowledgment waits for `handle_interaction/3` for up to 2.5 seconds after the
+interaction arrived. Return `{:reply, response}` to send a response with it, such as
+modal validation errors or the options for an external select menu. If the callback
+raises or takes longer, the interaction isn't acknowledged and Slack shows the user
+an error. A slow callback is left to finish, but its reply is dropped, so do slow
+work in a separate process.
 
 Then you start the Slack Supervisor in your application's supervision tree.
 

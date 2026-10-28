@@ -1,5 +1,6 @@
 Mimic.copy(Slack.API)
 Mimic.copy(Slack.MessageServer)
+Mimic.copy(Slack.TestBot)
 Mimic.copy(WebSockex)
 Mimic.copy(:public_key)
 ExUnit.start()

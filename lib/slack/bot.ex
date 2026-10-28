@@ -21,10 +21,42 @@ defmodule Slack.Bot do
   """
   @callback handle_event(type :: String.t(), payload :: map(), t()) :: any()
 
+  @doc """
+  Handle an interaction from Slack, such as a button click (`"block_actions"`),
+  a modal submission (`"view_submission"`), an external select menu search
+  (`"block_suggestion"`), or a shortcut (`"shortcut"`, `"message_action"`).
+
+  `type` is the payload's `"type"`, and every interaction type is passed on.
+  `payload` is the full interaction payload. Its `"user"` is a map rather than
+  an ID, and so is `"channel"` when there is one (modal submissions and global
+  shortcuts have none).
+
+  Most interactions are acknowledged right away and the return value is
+  ignored. When Slack accepts a response (as for `"view_submission"` and
+  `"block_suggestion"`), the acknowledgment waits for this callback, for up to
+  2.5 seconds after the interaction arrived. Return `{:reply, response}` to
+  send `response` with it, such as modal validation errors or the menu options,
+  or anything else to send none. If the callback raises or takes longer, the
+  interaction isn't acknowledged and Slack shows the user an error. A slow
+  callback is left to finish, but its reply is dropped, so do slow work in a
+  separate process.
+
+  `use Slack.Bot` defines a default that acknowledges interactions and ignores
+  them. Defining `handle_interaction/3` replaces it, so include a catch-all
+  clause, which can call `super/3`.
+  """
+  @callback handle_interaction(type :: String.t(), payload :: map(), t()) ::
+              {:reply, response :: map()} | any()
+
   defmacro __using__(_opts) do
     quote do
       import Slack.Bot
       @behaviour Slack.Bot
+
+      @impl Slack.Bot
+      def handle_interaction(_type, _payload, _bot), do: :ok
+
+      defoverridable handle_interaction: 3
     end
   end
 

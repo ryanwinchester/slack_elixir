@@ -12,4 +12,7 @@ defmodule Slack.TestBot do
   end
 
   def handle_event(_type, _payload, _bot), do: :noop
+
+  @impl Slack.Bot
+  def handle_interaction(_type, _payload, _bot), do: :ok
 end
