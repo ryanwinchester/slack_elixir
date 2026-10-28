@@ -52,16 +52,16 @@ defmodule Slack.ChannelServer do
     {:ok, state, {:continue, :join}}
   end
 
+  # The channels are already in the state, so only start their message servers.
   @impl true
   def handle_continue(:join, state) do
-    Enum.each(state.channels, &join(state.bot, &1))
+    Enum.each(state.channels, &start_message_server(state.bot, &1))
     {:noreply, state}
   end
 
   @impl true
   def handle_cast({:join, channel}, state) do
-    Logger.info("[Slack.ChannelServer] #{state.bot.module} joining #{channel}...")
-    {:ok, _} = Slack.MessageServer.start_supervised(state.bot, channel)
+    start_message_server(state.bot, channel)
     {:noreply, Map.update!(state, :channels, &[channel | &1])}
   end
 
@@ -69,6 +69,11 @@ defmodule Slack.ChannelServer do
     Logger.info("[Slack.ChannelServer] #{state.bot.module} leaving #{channel}...")
     :ok = Slack.MessageServer.stop(state.bot, channel)
     {:noreply, Map.update!(state, :channels, &List.delete(&1, channel))}
+  end
+
+  defp start_message_server(bot, channel) do
+    Logger.info("[Slack.ChannelServer] #{bot.module} joining #{channel}...")
+    {:ok, _} = Slack.MessageServer.start_supervised(bot, channel)
   end
 
   defp via_tuple(%Slack.Bot{module: bot}) do

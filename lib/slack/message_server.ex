@@ -24,7 +24,17 @@ defmodule Slack.MessageServer do
   end
 
   def send(bot, channel, message) when is_binary(channel) do
-    GenServer.cast(via_tuple(bot, channel), {:add, message})
+    # With `channels: false` there are no queues, and a cast to one would be
+    # dropped without a trace.
+    if Process.whereis(Slack.MessageServerRegistry) do
+      GenServer.cast(via_tuple(bot, channel), {:add, message})
+    else
+      raise """
+      [Slack.MessageServer] send_message/2 needs the per-channel message queues, \
+      which are disabled with `channels: false`. Use \
+      Slack.API.post("chat.postMessage", bot.token, %{channel: channel, text: text}) instead.
+      """
+    end
   end
 
   def stop(bot, channel) do

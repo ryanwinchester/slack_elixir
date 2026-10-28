@@ -138,7 +138,9 @@ defmodule Slack.Socket do
   end
 
   defp handle_envelope(%{"type" => "slash_commands", "payload" => payload} = envelope, state) do
-    dispatch(envelope, state, fn -> handle_slack_event("slash_commands", payload, state.bot) end)
+    dispatch(envelope, state, fn ->
+      handle_slack_event("slash_commands", payload, state.bot, state.channels?)
+    end)
   end
 
   defp handle_envelope(
@@ -295,8 +297,6 @@ defmodule Slack.Socket do
                 __STACKTRACE__
       end
   end
-
-  defp handle_slack_event(type, event, bot, channels? \\ true)
 
   # In the case the bot user has JOINED a channel, we need to handle this as a
   # special case.

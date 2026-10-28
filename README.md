@@ -97,6 +97,7 @@ management enabled. You can disable channel management with `channels: false`
  - `groups:read`
  - `im:read`
  - `mpim:read`
+ - `chat:write`
 
 #### Required Bot Event Subscriptions
  - `message.channels`
@@ -206,6 +207,29 @@ config :my_app, MyApp.SlackBot,
   ]
 ```
 
+### Channels
+
+To disable channel discovery and the per-channel message queues, set `channels: false`:
+
+```elixir
+config :my_app, MyApp.SlackBot,
+  app_token: "MY_SLACK_APP_TOKEN",
+  bot_token: "MY_SLACK_BOT_TOKEN",
+  bot: MyApp.SlackBot,
+  channels: false
+```
+
+This skips `users.conversations` at startup, so `channels:read`, `groups:read`,
+`im:read`, and `mpim:read` are only needed if your bot uses other features that
+require them. Socket Mode and event callbacks remain enabled, including channel
+join and leave callbacks. Omitting `channels`, or setting it to `true`, keeps the
+default behavior.
+
+With channel management disabled, `send_message/2` raises, because it needs the
+per-channel queues. Send messages with `Slack.API.post("chat.postMessage", bot.token,
+%{channel: channel_id, text: "Hello!"})` instead, which needs the `chat:write` scope.
+Direct API calls must handle rate limits themselves.
+
 ### TLS
 
 The Socket Mode connection verifies Slack's certificate and hostname. It trusts
@@ -224,26 +248,6 @@ config :my_app, MyApp.SlackBot,
   # ...
   ssl_options: [cacertfile: "/path/to/ca.pem"]
 ```
-
-To disable channel discovery and the per-channel message queues, set `channels: false`:
-
-```elixir
-config :my_app, MyApp.SlackBot,
-  app_token: "MY_SLACK_APP_TOKEN",
-  bot_token: "MY_SLACK_BOT_TOKEN",
-  bot: MyApp.SlackBot,
-  channels: false
-```
-
-This skips `users.conversations` at startup, so `channels:read`, `groups:read`,
-`im:read`, and `mpim:read` are only needed if your bot uses other features that
-require them. Socket Mode and event callbacks remain enabled, including channel
-join and leave callbacks. Omitting `channels` keeps the default behavior.
-
-With channel management disabled, use `Slack.API.post("chat.postMessage", bot.token,
-%{channel: channel_id, text: "Hello!"})` to send messages with the appropriate scopes.
-The `send_message/2` helper requires the per-channel queues and is unavailable in
-this mode. Direct API calls must handle rate limits themselves.
 
 ## Journey to v1.0 (Things that may or may not be added)
 

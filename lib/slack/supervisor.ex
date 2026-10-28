@@ -20,30 +20,42 @@ defmodule Slack.Supervisor do
     {app_token, bot_config} = Keyword.pop!(bot_config, :app_token)
     {bot_token, bot_config} = Keyword.pop!(bot_config, :bot_token)
     {bot_module, bot_config} = Keyword.pop!(bot_config, :bot)
-    {channel_config, bot_config} = Keyword.pop(bot_config, :channels, [])
+    {channel_config, bot_config} = Keyword.pop(bot_config, :channels, true)
     {ssl_options, _bot_config} = Keyword.pop(bot_config, :ssl_options, [])
+
+    channels? = channel_config != false
+    channel_options = channel_options(channel_config)
 
     bot = fetch_identity!(bot_token, bot_module)
 
     children =
-      channel_children(bot, channel_config) ++
+      channel_children(bot, channels?, channel_options) ++
         [
           {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
-          {Slack.Socket, {app_token, bot, ssl_options, channel_config != false}}
+          {Slack.Socket, {app_token, bot, ssl_options, channels?}}
         ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
 
-  defp channel_children(_bot, false), do: []
+  defp channel_children(_bot, false = _channels?, _channel_options), do: []
 
-  defp channel_children(bot, channel_config) do
+  defp channel_children(bot, true = _channels?, channel_options) do
     [
       {Registry, keys: :unique, name: Slack.ChannelServerRegistry},
       {Registry, keys: :unique, name: Slack.MessageServerRegistry},
       {DynamicSupervisor, strategy: :one_for_one, name: Slack.DynamicSupervisor},
-      {Slack.ChannelServer, {bot, channel_config}}
+      {Slack.ChannelServer, {bot, channel_options}}
     ]
+  end
+
+  # `channels: true`, `nil`, or leaving it out use the default channel options.
+  defp channel_options(config) when is_boolean(config) or is_nil(config), do: []
+  defp channel_options(config) when is_list(config), do: config
+
+  defp channel_options(config) do
+    raise ArgumentError,
+          "expected :channels to be a keyword list or a boolean, got: #{inspect(config)}"
   end
 
   defp fetch_identity!(bot_token, bot_module) do

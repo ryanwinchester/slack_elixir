@@ -258,6 +258,20 @@ defmodule Slack.SocketTest do
     end
   end
 
+  describe "the bot joining or leaving a channel" do
+    for {type, operation} <- [{"member_joined_channel", :join}, {"channel_left", :part}] do
+      test "#{type} goes to the channel server and the bot" do
+        handle_channel_event(unquote(type), @state)
+        assert_received {:channel_server, unquote(operation)}
+      end
+
+      test "#{type} only goes to the bot when channel management is disabled" do
+        handle_channel_event(unquote(type), %{@state | channels?: false})
+        refute_received {:channel_server, _operation}
+      end
+    end
+  end
+
   @tag capture_log: true
   test "socket connects with the TLS options from the bot config" do
     url = "wss://wss-primary.slack.com/link"
@@ -269,6 +283,7 @@ defmodule Slack.SocketTest do
     expect(WebSockex, :start_link, fn ^url, Slack.Socket, state, options ->
       assert state.bot == @bot
       assert state.app_token == "xapp-test"
+      assert state.channels? == true
       assert options == [ssl_options: Slack.Socket.ssl_options(crl_check: :peer)]
       {:ok, self()}
     end)
@@ -435,6 +450,28 @@ defmodule Slack.SocketTest do
       "accepts_response_payload" => accepts_response_payload,
       "payload" => payload
     })
+  end
+
+  # Handles the bot's channel event and waits for the bot to get it. The
+  # channel server is called first, so a call to it has arrived by then too.
+  defp handle_channel_event(type, state) do
+    parent = self()
+    event = %{"type" => type, "channel" => "channel-123", "user" => @bot.user_id}
+
+    stub(Slack.ChannelServer, :join, fn @bot, "channel-123" ->
+      send(parent, {:channel_server, :join})
+    end)
+
+    stub(Slack.ChannelServer, :part, fn @bot, "channel-123" ->
+      send(parent, {:channel_server, :part})
+    end)
+
+    expect(TestBot, :handle_event, fn ^type, ^event, @bot -> send(parent, :handle_event) end)
+
+    assert {:reply, {:text, ~S({"envelope_id":"eid-123"})}, ^state} =
+             Slack.Socket.handle_frame({:text, events_api(event)}, state)
+
+    assert_receive :handle_event
   end
 
   # Handles the envelope, asserts no acknowledgment is sent, and returns the log.
