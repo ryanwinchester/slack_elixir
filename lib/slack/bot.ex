@@ -41,17 +41,22 @@ defmodule Slack.Bot do
   callback is left to finish, but its reply is dropped, so do slow work in a
   separate process.
 
-  Optional: without it, interactions are acknowledged and ignored.
+  `use Slack.Bot` defines a default that acknowledges interactions and ignores
+  them. Defining `handle_interaction/3` replaces it, so include a catch-all
+  clause, which can call `super/3`.
   """
   @callback handle_interaction(type :: String.t(), payload :: map(), t()) ::
               {:reply, response :: map()} | any()
-
-  @optional_callbacks handle_interaction: 3
 
   defmacro __using__(_opts) do
     quote do
       import Slack.Bot
       @behaviour Slack.Bot
+
+      @impl Slack.Bot
+      def handle_interaction(_type, _payload, _bot), do: :ok
+
+      defoverridable handle_interaction: 3
     end
   end
 

@@ -21,8 +21,7 @@ defmodule Slack.Socket do
       bot: bot,
       alive?: true,
       ping_interval: @ping_interval,
-      response_timeout: @response_timeout,
-      handles_interactions?: handles_interactions?(bot.module)
+      response_timeout: @response_timeout
     }
 
     {:ok, %{"url" => url}} = Slack.API.post("apps.connections.open", state.app_token)
@@ -125,10 +124,10 @@ defmodule Slack.Socket do
        ) do
     handle_interaction = fn -> bot.module.handle_interaction(type, payload, bot) end
 
-    cond do
-      not state.handles_interactions? -> {:reply, ack_frame(envelope), state}
-      envelope["accepts_response_payload"] -> respond(envelope, type, state, handle_interaction)
-      true -> dispatch(envelope, state, handle_interaction)
+    if envelope["accepts_response_payload"] do
+      respond(envelope, type, state, handle_interaction)
+    else
+      dispatch(envelope, state, handle_interaction)
     end
   end
 
@@ -139,10 +138,6 @@ defmodule Slack.Socket do
     )
 
     {:reply, ack_frame(envelope), state}
-  end
-
-  defp handles_interactions?(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :handle_interaction, 3)
   end
 
   # Acknowledge once the handler is running. If it can't be started, don't, so

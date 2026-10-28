@@ -42,8 +42,7 @@ defmodule Slack.SocketTest do
     app_token: "xapp-test",
     alive?: true,
     ping_interval: 10,
-    response_timeout: 100,
-    handles_interactions?: true
+    response_timeout: 100
   }
 
   defmodule EventBot do
@@ -237,14 +236,24 @@ defmodule Slack.SocketTest do
                "block_suggestion eid-890 not acknowledged: the reply can't be encoded as JSON"
     end
 
-    test "are acknowledged and ignored when the bot doesn't handle them" do
-      state = %{@state | bot: %{@bot | module: EventBot}, handles_interactions?: false}
+    test "are acknowledged with no reply by the default handle_interaction/3" do
+      parent = self()
+      state = %{@state | bot: %{@bot | module: EventBot}}
+      expect(WebSockex, :cast, fn ^parent, {:send, frame} -> send(parent, {:ack, frame}) end)
 
       assert {:reply, {:text, ~S({"envelope_id":"eid-890"})}, ^state} =
+               Slack.Socket.handle_frame(
+                 {:text, interactive(%{"type" => "block_actions"})},
+                 state
+               )
+
+      assert {:ok, ^state} =
                Slack.Socket.handle_frame(
                  {:text, interactive(%{"type" => "view_submission"}, true)},
                  state
                )
+
+      assert_receive {:ack, {:text, ~S({"envelope_id":"eid-890"})}}
     end
   end
 

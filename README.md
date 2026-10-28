@@ -162,8 +162,9 @@ optional `handle_interaction/3` callback with the payload's `"type"` (for exampl
 `"block_actions"`, `"view_submission"`, `"block_suggestion"`, `"shortcut"` or
 `"message_action"`) and the full interaction payload. Every interaction type is
 passed on. In these payloads `"user"` is a map, not an ID, and so is `"channel"`
-when there is one (modal submissions and global shortcuts have none). Without
-`handle_interaction/3`, interactions are acknowledged and ignored.
+when there is one (modal submissions and global shortcuts have none). The default
+`handle_interaction/3` from `use Slack.Bot` acknowledges interactions and ignores
+them, so defining your own replaces it: include a catch-all clause.
 
 Most interactions are acknowledged right away and the return value is ignored.
 When Slack accepts a response, as for `"view_submission"` and `"block_suggestion"`,
