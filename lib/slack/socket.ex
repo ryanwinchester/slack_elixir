@@ -276,12 +276,16 @@ defmodule Slack.Socket do
       if Code.ensure_loaded?(CAStore) do
         [cacertfile: CAStore.file_path()]
       else
-        raise """
-        [Slack.Socket] could not load the OS CA certificates: #{Exception.message(error)}
+        reraise RuntimeError,
+                [
+                  message: """
+                  [Slack.Socket] could not load the OS CA certificates: #{Exception.message(error)}
 
-        Add `:castore` to your dependencies, or set `ssl_options: [cacertfile: path]` \
-        in your Slack bot config.
-        """
+                  Add `:castore` to your dependencies, or set `ssl_options: [cacertfile: path]` \
+                  in your Slack bot config.
+                  """
+                ],
+                __STACKTRACE__
       end
   end
 

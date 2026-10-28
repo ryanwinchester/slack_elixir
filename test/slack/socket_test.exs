@@ -348,7 +348,7 @@ defmodule Slack.SocketTest do
       {:Extension, {2, 5, 29, 17}, false, [dNSName: String.to_charlist(hostname)]}
 
     # P-256 keys with SHA-256 signatures; TLS 1.3 refuses the default test keys.
-    cert_options = [digest: :sha256, key: {:namedCurve, {1, 2, 840, 10045, 3, 1, 7}}]
+    cert_options = [digest: :sha256, key: {:namedCurve, :secp256r1}]
 
     %{server_config: server_config, client_config: client_config} =
       :public_key.pkix_test_data(%{
