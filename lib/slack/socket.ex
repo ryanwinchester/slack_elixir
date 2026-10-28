@@ -23,7 +23,20 @@ defmodule Slack.Socket do
 
     Logger.info("[Slack.Socket] connecting...")
 
-    WebSockex.start_link(url, __MODULE__, state)
+    cacerts = :public_key.cacerts_get()
+    host = url |> URI.parse() |> Map.fetch!(:host) |> String.to_charlist()
+
+    WebSockex.start_link(url, __MODULE__, state,
+      insecure: false,
+      cacerts: cacerts,
+      ssl_options: [
+        verify: :verify_peer,
+        # WebSockex uses ssl_options instead of its top-level TLS options.
+        cacerts: cacerts,
+        server_name_indication: host,
+        customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]
+      ]
+    )
   end
 
   # ----------------------------------------------------------------------------
