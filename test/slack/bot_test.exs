@@ -28,6 +28,19 @@ defmodule Slack.BotTest do
     TestBot.handle_event("message", message_event("No way, José!"), %{})
   end
 
+  test "post_message posts right away, with text or chat.postMessage arguments" do
+    bot = %Slack.Bot{id: "B1", module: TestBot, token: "xbot", team_id: "T1", user_id: "U1"}
+
+    for {message, args} <- [
+          {"hi", %{channel: "C1", text: "hi"}},
+          {%{text: "hi", thread_ts: "1.2"}, %{channel: "C1", text: "hi", thread_ts: "1.2"}},
+          {[text: "hi", mrkdwn: false], %{channel: "C1", text: "hi", mrkdwn: false}}
+        ] do
+      expect(Slack.API, :post, fn "chat.postMessage", "xbot", ^args -> {:ok, %{"ok" => true}} end)
+      assert {:ok, %{"ok" => true}} = Slack.Bot.post_message(bot, "C1", message)
+    end
+  end
+
   test "fallbacks" do
     Slack.MessageServer
     |> stub(:send, fn _, _, _ ->

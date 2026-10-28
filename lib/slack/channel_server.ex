@@ -38,6 +38,14 @@ defmodule Slack.ChannelServer do
     GenServer.cast(via_tuple(bot), {:part, channel})
   end
 
+  # Joins the channel if the bot hasn't yet, and returns its message server.
+  # A join that's already on its way from the same process is handled first.
+  def message_server(bot, channel) do
+    GenServer.call(via_tuple(bot), {:join, channel})
+  catch
+    :exit, reason -> {:error, reason}
+  end
+
   # ----------------------------------------------------------------------------
   # GenServer Callbacks
   # ----------------------------------------------------------------------------
@@ -60,9 +68,15 @@ defmodule Slack.ChannelServer do
   end
 
   @impl true
+  def handle_call({:join, channel}, _from, state) do
+    {message_server, state} = join_channel(state, channel)
+    {:reply, {:ok, message_server}, state}
+  end
+
+  @impl true
   def handle_cast({:join, channel}, state) do
-    start_message_server(state.bot, channel)
-    {:noreply, Map.update!(state, :channels, &[channel | &1])}
+    {_message_server, state} = join_channel(state, channel)
+    {:noreply, state}
   end
 
   def handle_cast({:part, channel}, state) do
@@ -71,18 +85,36 @@ defmodule Slack.ChannelServer do
     {:noreply, Map.update!(state, :channels, &List.delete(&1, channel))}
   end
 
-  defp start_message_server(bot, channel) do
-    Logger.info("[Slack.ChannelServer] #{bot.module} joining #{channel}...")
-    {:ok, _} = Slack.MessageServer.start_supervised(bot, channel)
+  defp join_channel(state, channel) do
+    message_server = start_message_server(state.bot, channel)
+
+    if channel in state.channels do
+      {message_server, state}
+    else
+      {message_server, Map.update!(state, :channels, &[channel | &1])}
+    end
   end
 
-  defp via_tuple(%Slack.Bot{module: bot}) do
-    {:via, Registry, {Slack.ChannelServerRegistry, bot}}
+  # The message server can already be running, for example when this server
+  # restarted, or the channel got a message before the join arrived.
+  defp start_message_server(bot, channel) do
+    case Slack.MessageServer.start_supervised(bot, channel) do
+      {:ok, message_server} ->
+        Logger.info("[Slack.ChannelServer] #{bot.module} joined #{channel}")
+        message_server
+
+      {:error, {:already_started, message_server}} ->
+        message_server
+    end
   end
+
+  defp via_tuple(%Slack.Bot{module: bot}), do: via_tuple(bot)
+  defp via_tuple(bot), do: {:via, Registry, {Slack.ChannelServerRegistry, bot}}
 
   defp fetch_channels(token, types) when is_binary(types) do
     "users.conversations"
     |> Slack.API.stream(token, "channels", types: types)
     |> Enum.map(& &1["id"])
+    |> Enum.uniq()
   end
 end

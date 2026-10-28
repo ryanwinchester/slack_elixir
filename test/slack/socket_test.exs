@@ -259,7 +259,11 @@ defmodule Slack.SocketTest do
   end
 
   describe "the bot joining or leaving a channel" do
-    for {type, operation} <- [{"member_joined_channel", :join}, {"channel_left", :part}] do
+    for {type, operation} <- [
+          {"member_joined_channel", :join},
+          {"channel_left", :part},
+          {"group_left", :part}
+        ] do
       test "#{type} goes to the channel server and the bot" do
         handle_channel_event(unquote(type), @state)
         assert_received {:channel_server, unquote(operation)}
@@ -283,12 +287,12 @@ defmodule Slack.SocketTest do
     expect(WebSockex, :start_link, fn ^url, Slack.Socket, state, options ->
       assert state.bot == @bot
       assert state.app_token == "xapp-test"
-      assert state.channels? == true
+      assert state.channels? == false
       assert options == [ssl_options: Slack.Socket.ssl_options(crl_check: :peer)]
       {:ok, self()}
     end)
 
-    assert {:ok, pid} = Slack.Socket.start_link({"xapp-test", @bot, [crl_check: :peer]})
+    assert {:ok, pid} = Slack.Socket.start_link({"xapp-test", @bot, [crl_check: :peer], false})
     assert pid == self()
   end
 

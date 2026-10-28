@@ -64,6 +64,7 @@ settings:
       - message.channels
       - member_joined_channel
       - channel_left
+      - group_left
   interactivity:
     # Deliver button actions, modal events, and shortcuts through Socket Mode.
     # Shortcuts also need to be declared under `features.shortcuts`, and need
@@ -103,6 +104,7 @@ management enabled. You can disable channel management with `channels: false`
  - `message.channels`
  - `member_joined_channel`
  - `channel_left`
+ - `group_left`
 
 ## Usage
 
@@ -219,16 +221,18 @@ config :my_app, MyApp.SlackBot,
   channels: false
 ```
 
-This skips `users.conversations` at startup, so `channels:read`, `groups:read`,
-`im:read`, and `mpim:read` are only needed if your bot uses other features that
-require them. Socket Mode and event callbacks remain enabled, including channel
-join and leave callbacks. Omitting `channels`, or setting it to `true`, keeps the
-default behavior.
+This skips `users.conversations` at startup. Socket Mode and event callbacks
+remain enabled, including the channel join and leave callbacks, and those event
+subscriptions still need `channels:read`, `groups:read`, and `mpim:read` (for
+group DMs). `im:read` is only needed if your bot uses other features that require
+it. Omitting `channels`, or setting it to `true`, keeps the default behavior.
 
-With channel management disabled, `send_message/2` raises, because it needs the
-per-channel queues. Send messages with `Slack.API.post("chat.postMessage", bot.token,
-%{channel: channel_id, text: "Hello!"})` instead, which needs the `chat:write` scope.
-Direct API calls must handle rate limits themselves.
+With channel management disabled there are no message queues, so `send_message/2`
+logs an error and returns `{:error, :no_message_queues}`. Use
+`post_message(bot, channel, message)` instead, with the bot passed to your
+callbacks. It posts right away and needs the `chat:write` scope, but it doesn't
+keep to Slack's rate limit of one message per second per channel, so handle rate
+limits yourself.
 
 ### TLS
 

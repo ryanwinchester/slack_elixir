@@ -41,10 +41,11 @@ defmodule Slack.SupervisorTest do
     refute Process.whereis(Slack.MessageServerRegistry)
     refute Process.whereis(Slack.DynamicSupervisor)
     assert socket_state(supervisor).channels? == false
+    assert_no_message_queues()
+  end
 
-    assert_raise RuntimeError, ~r/disabled with `channels: false`/, fn ->
-      Slack.MessageServer.send(Slack.TestBot, "channel-123", "hi")
-    end
+  test "send_message doesn't raise when Slack.Supervisor isn't running" do
+    assert_no_message_queues()
   end
 
   test "channel discovery and message queues remain enabled by default" do
@@ -77,8 +78,10 @@ defmodule Slack.SupervisorTest do
   end
 
   test "channels must be a keyword list or a boolean" do
-    assert_raise ArgumentError, ~r/expected :channels to be a keyword list or a boolean/, fn ->
-      Slack.Supervisor.init(@config ++ [channels: "im"])
+    for channels <- ["im", ["channel-123"]] do
+      assert_raise ArgumentError, ~r/expected :channels to be a keyword list or a boolean/, fn ->
+        Slack.Supervisor.init(@config ++ [channels: channels])
+      end
     end
   end
 
@@ -93,6 +96,78 @@ defmodule Slack.SupervisorTest do
 
     assert [{_, _}] = Registry.lookup(Slack.ChannelServerRegistry, Slack.TestBot)
     assert socket_state(supervisor).channels? == true
+  end
+
+  describe "message queues" do
+    setup do
+      stub(Slack.API, :stream, fn "users.conversations", "xbot-test", "channels", _options ->
+        [%{"id" => "channel-123"}]
+      end)
+
+      stub(Slack.API, :post, fn "chat.postMessage", "xbot-test", _args -> {:ok, %{}} end)
+
+      supervisor = start_supervised!({Slack.Supervisor, @config})
+      [{channel_server, _}] = Registry.lookup(Slack.ChannelServerRegistry, Slack.TestBot)
+
+      %{supervisor: supervisor, channel_server: channel_server, bot: socket_state(supervisor).bot}
+    end
+
+    test "leaving a channel stops its queue for good", context do
+      Slack.ChannelServer.part(context.bot, "channel-123")
+
+      assert :sys.get_state(context.channel_server).channels == []
+      assert DynamicSupervisor.which_children(Slack.DynamicSupervisor) == []
+    end
+
+    test "the bot can rejoin a channel, and leave one it has no queue for", context do
+      Slack.ChannelServer.part(context.bot, "channel-123")
+      Slack.ChannelServer.join(context.bot, "channel-123")
+      Slack.ChannelServer.part(context.bot, "channel-456")
+
+      assert :sys.get_state(context.channel_server).channels == ["channel-123"]
+      assert queued("channel-123") == []
+    end
+
+    test "a restarted channel server keeps the running queues", context do
+      queue = GenServer.whereis(message_server("channel-123"))
+
+      :ok = Supervisor.terminate_child(context.supervisor, Slack.ChannelServer)
+      {:ok, channel_server} = Supervisor.restart_child(context.supervisor, Slack.ChannelServer)
+
+      assert :sys.get_state(channel_server).channels == ["channel-123"]
+      assert GenServer.whereis(message_server("channel-123")) == queue
+    end
+
+    test "send_message starts a queue for a channel the bot hasn't joined" do
+      assert :ok = Slack.MessageServer.send(Slack.TestBot, "channel-456", "hi")
+      assert queued("channel-456") == ["hi"]
+    end
+
+    test "send_message right after the bot joins a channel waits for the join", context do
+      Slack.ChannelServer.join(context.bot, "channel-456")
+
+      assert :ok = Slack.MessageServer.send(Slack.TestBot, "channel-456", "hi")
+      assert queued("channel-456") == ["hi"]
+      assert :sys.get_state(context.channel_server).channels == ["channel-456", "channel-123"]
+    end
+  end
+
+  defp assert_no_message_queues do
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:error, :no_message_queues} =
+                 Slack.MessageServer.send(Slack.TestBot, "channel-123", "hi")
+      end)
+
+    assert log =~ "message to channel-123 not sent"
+  end
+
+  defp message_server(channel) do
+    {:via, Registry, {Slack.MessageServerRegistry, {Slack.TestBot, channel}}}
+  end
+
+  defp queued(channel) do
+    :queue.to_list(:sys.get_state(message_server(channel)).queue)
   end
 
   defp socket_state(supervisor) do

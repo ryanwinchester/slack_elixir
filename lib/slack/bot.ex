@@ -77,6 +77,11 @@ defmodule Slack.Bot do
 
   The `message` can be just the message text, or a `t:map/0` of properties that
   are accepted by Slack's `chat.postMessage` API endpoint.
+
+  Messages are queued per channel and sent one per second, Slack's rate limit.
+  A channel the bot hasn't joined yet, like a new DM, gets a queue first. With
+  `channels: false` there are no queues, so this logs an error and returns
+  `{:error, :no_message_queues}`; use `post_message/3` instead.
   """
   @spec send_message(String.t(), String.t() | map()) :: Macro.t()
   defmacro send_message(channel, message) do
@@ -84,4 +89,21 @@ defmodule Slack.Bot do
       Slack.MessageServer.send(__MODULE__, unquote(channel), unquote(message))
     end
   end
+
+  @doc """
+  Post a message to a channel right away, without a queue.
+
+  The `message` can be the message text, or a `t:map/0` or keyword list of
+  arguments that Slack's `chat.postMessage` API endpoint accepts. Unlike
+  `send_message/2`, it works with `channels: false`, but it doesn't keep to
+  Slack's rate limit of one message per second per channel.
+  """
+  @spec post_message(t(), String.t(), String.t() | map() | keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def post_message(%__MODULE__{token: token}, channel, message) do
+    Slack.API.post("chat.postMessage", token, message_args(channel, message))
+  end
+
+  defp message_args(channel, text) when is_binary(text), do: %{channel: channel, text: text}
+  defp message_args(channel, args), do: Enum.into(args, %{channel: channel})
 end

@@ -23,22 +23,38 @@ defmodule Slack.MessageServer do
     )
   end
 
+  # A channel the bot hasn't joined yet, like a new DM, gets a message server
+  # first, so messages aren't dropped without a trace.
   def send(bot, channel, message) when is_binary(channel) do
-    # With `channels: false` there are no queues, and a cast to one would be
-    # dropped without a trace.
-    if Process.whereis(Slack.MessageServerRegistry) do
-      GenServer.cast(via_tuple(bot, channel), {:add, message})
-    else
-      raise """
-      [Slack.MessageServer] send_message/2 needs the per-channel message queues, \
-      which are disabled with `channels: false`. Use \
-      Slack.API.post("chat.postMessage", bot.token, %{channel: channel, text: text}) instead.
-      """
+    case message_server(bot, channel) do
+      {:ok, message_server} ->
+        GenServer.cast(message_server, {:add, message})
+
+      {:error, :no_message_queues} = error ->
+        Logger.error("""
+        [Slack.MessageServer] message to #{channel} not sent: there are no message \
+        queues, because channel management is disabled with `channels: false` (use \
+        post_message/3 instead), or Slack.Supervisor isn't running.
+        """)
+
+        error
+
+      {:error, reason} = error ->
+        Logger.error("[Slack.MessageServer] message to #{channel} not sent: #{inspect(reason)}")
+        error
     end
   end
 
+  # Stop it through the supervisor, which would otherwise restart it.
   def stop(bot, channel) do
-    GenServer.stop(via_tuple(bot, channel))
+    case GenServer.whereis(via_tuple(bot, channel)) do
+      nil ->
+        :ok
+
+      message_server ->
+        _ = DynamicSupervisor.terminate_child(Slack.DynamicSupervisor, message_server)
+        :ok
+    end
   end
 
   # ----------------------------------------------------------------------------
@@ -90,30 +106,29 @@ defmodule Slack.MessageServer do
 
       {{:value, message}, rest} ->
         Logger.debug("[Slack.MessageServer] Sending next message: #{inspect(message)}")
-        send_message(state.bot.token, state.channel, message)
+        send_message(state.bot, state.channel, message)
         %{state | queue: rest, timer_ref: schedule_next()}
     end
   end
 
-  # Users can send a message either as string, or as a keyword/map of args.
-  # When they send it as a string, we'll put it into a map, with the `:text`
-  # key. The args are assumed to be any arg that is accepted by Slack's
-  # `chat.postMessage` API endpoint.
-  defp send_message(token, channel, message) when is_binary(message) do
-    send_message(token, %{channel: channel, text: message})
-  end
-
-  defp send_message(token, channel, message) do
-    send_message(token, Enum.into(message, %{channel: channel}))
-  end
-
-  defp send_message(token, %{} = args) do
-    case Slack.API.post("chat.postMessage", token, args) do
+  defp send_message(bot, channel, message) do
+    case Slack.Bot.post_message(bot, channel, message) do
       {:ok, _} ->
-        Logger.debug("[Slack.MessageServer] SENT: #{inspect(args)}")
+        Logger.debug("[Slack.MessageServer] SENT: #{inspect(message)}")
 
       {:error, error} ->
         Logger.error("[Slack.MessageServer] error sending message #{inspect(error)}")
+    end
+  end
+
+  defp message_server(bot, channel) do
+    if Process.whereis(Slack.MessageServerRegistry) do
+      case GenServer.whereis(via_tuple(bot, channel)) do
+        nil -> Slack.ChannelServer.message_server(bot, channel)
+        message_server -> {:ok, message_server}
+      end
+    else
+      {:error, :no_message_queues}
     end
   end
 

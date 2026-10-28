@@ -51,11 +51,14 @@ defmodule Slack.Supervisor do
 
   # `channels: true`, `nil`, or leaving it out use the default channel options.
   defp channel_options(config) when is_boolean(config) or is_nil(config), do: []
-  defp channel_options(config) when is_list(config), do: config
 
   defp channel_options(config) do
-    raise ArgumentError,
-          "expected :channels to be a keyword list or a boolean, got: #{inspect(config)}"
+    if is_list(config) and Keyword.keyword?(config) do
+      config
+    else
+      raise ArgumentError,
+            "expected :channels to be a keyword list or a boolean, got: #{inspect(config)}"
+    end
   end
 
   defp fetch_identity!(bot_token, bot_module) do
