@@ -16,19 +16,21 @@ defmodule Slack.MessageServer do
     GenServer.start_link(__MODULE__, {bot, channel}, name: via_tuple(bot, channel))
   end
 
-  def start_supervised(bot, channel) do
-    DynamicSupervisor.start_child(
-      Slack.DynamicSupervisor,
-      {Slack.MessageServer, {bot, channel}}
-    )
-  end
+  # Queues the message on the channel's message server, which starts the first
+  # time the bot sends to the channel.
+  def send(bot_module, channel, message) when is_atom(bot_module) and is_binary(channel) do
+    case message_server(bot_module, channel) do
+      {:ok, message_server} ->
+        GenServer.cast(message_server, {:add, message})
 
-  def send(bot, channel, message) when is_binary(channel) do
-    GenServer.cast(via_tuple(bot, channel), {:add, message})
-  end
+      {:error, reason} = error ->
+        Logger.error(
+          "[Slack.MessageServer] message to #{channel} not sent: " <>
+            error_message(reason, bot_module)
+        )
 
-  def stop(bot, channel) do
-    GenServer.stop(via_tuple(bot, channel))
+        error
+    end
   end
 
   # ----------------------------------------------------------------------------
@@ -41,7 +43,8 @@ defmodule Slack.MessageServer do
       bot: bot,
       channel: channel,
       queue: :queue.new(),
-      timer_ref: schedule_next()
+      # Paused, so the first message is sent right away.
+      timer_ref: nil
     }
 
     {:ok, state}
@@ -106,6 +109,41 @@ defmodule Slack.MessageServer do
         Logger.error("[Slack.MessageServer] error sending message #{inspect(error)}")
     end
   end
+
+  defp message_server(bot_module, channel) do
+    case Registry.lookup(Slack.MessageServerRegistry, {bot_module, channel}) do
+      [{message_server, _value}] -> {:ok, message_server}
+      [] -> start_message_server(bot_module, channel)
+    end
+  rescue
+    # Slack.Supervisor starts the registry, so it isn't running.
+    ArgumentError -> {:error, :not_started}
+  end
+
+  defp start_message_server(bot_module, channel) do
+    # Slack.Supervisor keeps the bot in the registry's metadata.
+    with {:ok, bot} <- registered_bot(bot_module) do
+      case DynamicSupervisor.start_child(Slack.DynamicSupervisor, {__MODULE__, {bot, channel}}) do
+        # Another process started it first.
+        {:error, {:already_started, message_server}} -> {:ok, message_server}
+        result -> result
+      end
+    end
+  end
+
+  defp registered_bot(bot_module) do
+    case Registry.meta(Slack.MessageServerRegistry, bot_module) do
+      {:ok, bot} -> {:ok, bot}
+      :error -> {:error, :unknown_bot}
+    end
+  end
+
+  defp error_message(:not_started, _bot_module), do: "Slack.Supervisor isn't running"
+
+  defp error_message(:unknown_bot, bot_module),
+    do: "#{inspect(bot_module)} isn't the bot started by Slack.Supervisor"
+
+  defp error_message(reason, _bot_module), do: inspect(reason)
 
   defp schedule_next(after_ms \\ @message_rate_ms) do
     Process.send_after(self(), :send, after_ms)

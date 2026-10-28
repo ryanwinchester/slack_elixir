@@ -289,26 +289,6 @@ defmodule Slack.Socket do
       end
   end
 
-  # In the case the bot user has JOINED a channel, we need to handle this as a
-  # special case.
-  defp handle_slack_event(
-         "member_joined_channel" = type,
-         %{"user" => user} = event,
-         %{user_id: user} = bot
-       ) do
-    Logger.debug("[Slack.Socket] member_joined_channel")
-    handle_bot_joined(event, bot)
-    bot.module.handle_event(type, event, bot)
-  end
-
-  # In the case the bot user has PARTED a channel, we need to handle this as a
-  # special case.
-  defp handle_slack_event("channel_left" = type, event, bot) do
-    Logger.debug("[Slack.Socket] channel_left")
-    handle_parted(event, bot)
-    bot.module.handle_event(type, event, bot)
-  end
-
   # Ignore messages from yourself...
   defp handle_slack_event("message", %{"user" => user}, %{user_id: user}), do: :ok
   defp handle_slack_event("message", %{"bot_id" => bot_id}, %{id: bot_id}), do: :ok
@@ -317,14 +297,6 @@ defmodule Slack.Socket do
   defp handle_slack_event(type, event, bot) do
     Logger.debug("[Slack.Socket] Sending #{type} event to #{bot.module}")
     bot.module.handle_event(type, event, bot)
-  end
-
-  defp handle_bot_joined(%{"channel" => channel} = _event, bot) do
-    Slack.ChannelServer.join(bot, channel)
-  end
-
-  defp handle_parted(%{"channel" => channel} = _event, bot) do
-    Slack.ChannelServer.part(bot, channel)
   end
 
   defp ack_frame(envelope, response \\ nil) do

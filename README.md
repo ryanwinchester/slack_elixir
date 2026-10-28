@@ -24,7 +24,7 @@ It's a relatively thin wrapper, which keeps it flexible and easy to maintain.
  - connects to Slack using a websocket connection to listen for your event subscriptions.
  - uses the [Web API](https://api.slack.com/web) to send messages, etc.
  - uses dynamically supervised gen servers to handle each channel's message rate-limiting with a message queue
-   per channel.
+   per channel, started the first time the bot sends to that channel.
 
 ## Installation
 
@@ -53,17 +53,11 @@ oauth_config:
   scopes:
     bot:
       - channels:history
-      - channels:read
-      - groups:read
-      - im:read
-      - mpim:read
       - chat:write
 settings:
   event_subscriptions:
     bot_events:
       - message.channels
-      - member_joined_channel
-      - channel_left
   interactivity:
     # Deliver button actions, modal events, and shortcuts through Socket Mode.
     # Shortcuts also need to be declared under `features.shortcuts`, and need
@@ -87,20 +81,15 @@ You will need to:
   - Enable Interactivity for buttons, modals, and shortcuts (shortcuts also
     have to be created there, and need the `commands` scope)
 
-See below for some minimum required scopes and event subscriptions. You will
+See below for the scopes and event subscriptions the example bot needs. You will
 need to add more scopes and subscriptions depending on what you want to do.
 
 #### Required Bot Token scopes:
  - `channels:history`
- - `channels:read`
- - `groups:read`
- - `im:read`
- - `mpim:read`
+ - `chat:write`
 
 #### Required Bot Event Subscriptions
  - `message.channels`
- - `member_joined_channel`
- - `channel_left`
 
 ## Usage
 
@@ -157,6 +146,12 @@ defmodule MyApp.Slackbot do
 end
 ```
 
+`send_message/2` sends to a channel ID, or to a user ID to message them directly.
+Messages are queued per channel and sent at most one per second, Slack's rate
+limit for posting to a channel. A channel's queue starts the first time the bot
+sends to it, so the bot doesn't list its conversations at startup, and the
+`channels` option that configured that is deprecated.
+
 Interactions, such as button clicks, modal submissions and shortcuts, go to the
 optional `handle_interaction/3` callback with the payload's `"type"` (for example
 `"block_actions"`, `"view_submission"`, `"block_suggestion"`, `"shortcut"` or
@@ -197,12 +192,7 @@ For example:
 config :my_app, MyApp.SlackBot,
   app_token: "MY_SLACK_APP_TOKEN",
   bot_token: "MY_SLACK_BOT_TOKEN",
-  bot: MyApp.SlackBot,
-  # Add this if you want to customize the channel types to join.
-  # By default we join all channel types: public_channel, private_channel, im, mpim.
-  channels: [
-    types: ["public_channel", "im", "private_channel"]
-  ]
+  bot: MyApp.SlackBot
 ```
 
 ### TLS
