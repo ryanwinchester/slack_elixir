@@ -21,7 +21,8 @@ defmodule Slack.Socket do
       bot: bot,
       alive?: true,
       ping_interval: @ping_interval,
-      response_timeout: @response_timeout
+      response_timeout: @response_timeout,
+      handles_interactions?: handles_interactions?(bot.module)
     }
 
     {:ok, %{"url" => url}} = Slack.API.post("apps.connections.open", state.app_token)
@@ -94,8 +95,9 @@ defmodule Slack.Socket do
   end
 
   @impl WebSockex
-  def handle_cast({:send, {type, msg} = frame}, state) do
-    Logger.debug("[Slack.Socket] sending #{type} frame with payload: #{msg}")
+  def handle_cast({:send, {type, _msg} = frame}, state) do
+    # Replies can echo user input, so don't log them.
+    Logger.debug("[Slack.Socket] sending #{type} frame")
     {:reply, frame, state}
   end
 
@@ -124,13 +126,20 @@ defmodule Slack.Socket do
     handle_interaction = fn -> bot.module.handle_interaction(type, payload, bot) end
 
     cond do
-      not handles_interactions?(bot.module) -> {:reply, ack_frame(envelope), state}
-      envelope["accepts_response_payload"] -> respond(envelope, state, handle_interaction)
+      not state.handles_interactions? -> {:reply, ack_frame(envelope), state}
+      envelope["accepts_response_payload"] -> respond(envelope, type, state, handle_interaction)
       true -> dispatch(envelope, state, handle_interaction)
     end
   end
 
-  defp handle_envelope(envelope, state), do: {:reply, ack_frame(envelope), state}
+  defp handle_envelope(envelope, state) do
+    Logger.warning(
+      "[Slack.Socket] acknowledged and ignored unhandled " <>
+        "#{envelope["type"]} envelope: #{envelope["envelope_id"]}"
+    )
+
+    {:reply, ack_frame(envelope), state}
+  end
 
   defp handles_interactions?(module) do
     Code.ensure_loaded?(module) and function_exported?(module, :handle_interaction, 3)
@@ -149,28 +158,30 @@ defmodule Slack.Socket do
   # handler and send `{:reply, response}` with it. If the handler crashes or
   # runs out of time, don't acknowledge, so Slack shows the user an error
   # instead of the interaction being silently dropped.
-  defp respond(%{"envelope_id" => envelope_id} = envelope, state, fun) do
+  defp respond(%{"envelope_id" => envelope_id} = envelope, type, state, fun) do
     socket = self()
-    type = envelope["payload"]["type"]
+    response_timeout = state.response_timeout
+    # Slack's clock started when the envelope arrived, not when the handler starts.
+    deadline = System.monotonic_time(:millisecond) + response_timeout
+    not_acknowledged = "[Slack.Socket] #{type} #{envelope_id} not acknowledged"
 
     await_response = fn ->
       task = Task.Supervisor.async_nolink(task_supervisor(envelope), fun)
+      timeout = max(deadline - System.monotonic_time(:millisecond), 0)
 
-      case Task.yield(task, state.response_timeout) || Task.shutdown(task, :brutal_kill) do
+      # A handler that runs out of time is left to finish, not killed halfway.
+      case Task.yield(task, timeout) || Task.ignore(task) do
         {:ok, {:reply, response}} ->
-          WebSockex.cast(socket, {:send, ack_frame(envelope, response)})
+          send_ack(socket, envelope, response, not_acknowledged)
 
         {:ok, _} ->
-          WebSockex.cast(socket, {:send, ack_frame(envelope)})
+          send_ack(socket, envelope, nil, not_acknowledged)
 
-        {:exit, _reason} ->
-          Logger.error("[Slack.Socket] #{type} #{envelope_id} not acknowledged: handler crashed")
+        {:exit, reason} ->
+          Logger.error("#{not_acknowledged}: handler exited: #{exit_reason(reason)}")
 
         nil ->
-          Logger.error(
-            "[Slack.Socket] #{type} #{envelope_id} not acknowledged: " <>
-              "handler took longer than #{state.response_timeout}ms"
-          )
+          Logger.error("#{not_acknowledged}: handler took longer than #{response_timeout}ms")
       end
     end
 
@@ -178,8 +189,31 @@ defmodule Slack.Socket do
     {:ok, state}
   end
 
+  defp send_ack(socket, envelope, response, not_acknowledged) do
+    WebSockex.cast(socket, {:send, ack_frame(envelope, response)})
+  rescue
+    error in [Jason.EncodeError, Protocol.UndefinedError] ->
+      Logger.error(
+        "#{not_acknowledged}: the reply can't be encoded as JSON (#{inspect(error.__struct__)})"
+      )
+  end
+
+  defp exit_reason({exception, _stacktrace}) when is_exception(exception) do
+    Exception.message(exception)
+  end
+
+  defp exit_reason(reason), do: inspect(reason)
+
   defp start_task(envelope, fun) do
-    case Task.Supervisor.start_child(task_supervisor(envelope), fun) do
+    result =
+      try do
+        Task.Supervisor.start_child(task_supervisor(envelope), fun)
+      catch
+        # The task supervisor isn't running, for example while restarting.
+        :exit, reason -> {:exit, reason}
+      end
+
+    case result do
       {:ok, _pid} ->
         :ok
 
@@ -247,22 +281,10 @@ defmodule Slack.Socket do
     Slack.ChannelServer.part(bot, channel)
   end
 
-  defp ack_frame(payload) do
-    ack =
-      payload
-      |> Map.take(["envelope_id"])
-      |> Jason.encode!()
+  defp ack_frame(envelope, response \\ nil) do
+    ack = Map.take(envelope, ["envelope_id"])
+    ack = if response, do: Map.put(ack, "payload", response), else: ack
 
-    {:text, ack}
-  end
-
-  defp ack_frame(envelope, response) do
-    ack =
-      envelope
-      |> Map.take(["envelope_id"])
-      |> Map.put("payload", response)
-      |> Jason.encode!()
-
-    {:text, ack}
+    {:text, Jason.encode!(ack)}
   end
 end

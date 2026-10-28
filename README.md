@@ -145,8 +145,8 @@ defmodule MyApp.Slackbot do
     end)
   end
 
-  def handle_interaction("view_submission", %{"view" => view}, _bot) do
-    if view["state"]["values"]["name"]["name_input"]["value"] in [nil, ""] do
+  def handle_interaction("view_submission", %{"view" => %{"callback_id" => "signup"} = view}, _bot) do
+    if get_in(view, ["state", "values", "name", "name_input", "value"]) in [nil, ""] do
       {:reply, %{response_action: "errors", errors: %{name: "Please enter a name"}}}
     else
       :ok
@@ -161,15 +161,18 @@ Interactions, such as button clicks, modal submissions and shortcuts, go to the
 optional `handle_interaction/3` callback with the payload's `"type"` (for example
 `"block_actions"`, `"view_submission"`, `"block_suggestion"`, `"shortcut"` or
 `"message_action"`) and the full interaction payload. Every interaction type is
-passed on, and in these payloads `"user"` and `"channel"` are maps, not IDs.
-Without `handle_interaction/3`, interactions are acknowledged and ignored.
+passed on. In these payloads `"user"` is a map, not an ID, and so is `"channel"`
+when there is one (modal submissions and global shortcuts have none). Without
+`handle_interaction/3`, interactions are acknowledged and ignored.
 
 Most interactions are acknowledged right away and the return value is ignored.
 When Slack accepts a response, as for `"view_submission"` and `"block_suggestion"`,
-the acknowledgment waits for `handle_interaction/3` for up to 2.5 seconds. Return
-`{:reply, response}` to send a response with it, such as modal validation errors or
-the options for an external select menu. If the callback raises or takes longer,
-the interaction isn't acknowledged and Slack shows the user an error.
+the acknowledgment waits for `handle_interaction/3` for up to 2.5 seconds after the
+interaction arrived. Return `{:reply, response}` to send a response with it, such as
+modal validation errors or the options for an external select menu. If the callback
+raises or takes longer, the interaction isn't acknowledged and Slack shows the user
+an error. A slow callback is left to finish, but its reply is dropped, so do slow
+work in a separate process.
 
 Then you start the Slack Supervisor in your application's supervision tree.
 

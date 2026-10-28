@@ -42,7 +42,8 @@ defmodule Slack.SocketTest do
     app_token: "xapp-test",
     alive?: true,
     ping_interval: 10,
-    response_timeout: 100
+    response_timeout: 100,
+    handles_interactions?: true
   }
 
   defmodule EventBot do
@@ -93,14 +94,29 @@ defmodule Slack.SocketTest do
     assert_receive :slash_command_dispatched
   end
 
-  test "socket acknowledges envelopes it doesn't handle" do
-    for envelope <- [
-          %{"envelope_id" => "eid-1", "type" => "something_new", "payload" => %{}},
-          %{"envelope_id" => "eid-1", "type" => "interactive", "payload" => %{}}
-        ] do
-      assert {:reply, {:text, ~S({"envelope_id":"eid-1"})}, @state} =
-               Slack.Socket.handle_frame({:text, Jason.encode!(envelope)}, @state)
+  test "socket acknowledges envelopes it doesn't handle, with a warning" do
+    for type <- ["something_new", "interactive"] do
+      envelope = Jason.encode!(%{"envelope_id" => "eid-1", "type" => type, "payload" => %{}})
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:reply, {:text, ~S({"envelope_id":"eid-1"})}, @state} =
+                   Slack.Socket.handle_frame({:text, envelope}, @state)
+        end)
+
+      assert log =~ "acknowledged and ignored unhandled #{type} envelope: eid-1"
     end
+  end
+
+  test "socket doesn't acknowledge envelopes when it can't start a handler" do
+    stop_supervised!(Slack.TaskSupervisors)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert {:ok, @state} = Slack.Socket.handle_frame({:text, @foo_event}, @state)
+      end)
+
+    assert log =~ "could not handle events_api eid-234"
   end
 
   test "socket handles a disconnect warning" do
@@ -193,21 +209,36 @@ defmodule Slack.SocketTest do
       expect(TestBot, :handle_interaction, fn _type, _payload, _bot -> raise "boom" end)
 
       log = refute_ack(interactive(%{"type" => "view_submission"}, true))
-      assert log =~ "view_submission eid-890 not acknowledged: handler crashed"
+      assert log =~ "view_submission eid-890 not acknowledged: handler exited: boom"
     end
 
-    test "are not acknowledged when the handler takes too long" do
+    test "are not acknowledged when the handler takes too long, but it isn't killed" do
+      parent = self()
+
       expect(TestBot, :handle_interaction, fn _type, _payload, _bot ->
-        Process.sleep(1_000)
+        Process.sleep(200)
+        send(parent, :handler_finished)
         {:reply, %{}}
       end)
 
       log = refute_ack(interactive(%{"type" => "view_submission"}, true))
       assert log =~ "view_submission eid-890 not acknowledged: handler took longer than 100ms"
+      assert_received :handler_finished
+    end
+
+    test "are not acknowledged when the reply can't be encoded" do
+      expect(TestBot, :handle_interaction, fn _type, _payload, _bot ->
+        {:reply, %{options: [{"not", "json"}]}}
+      end)
+
+      log = refute_ack(interactive(%{"type" => "block_suggestion"}, true))
+
+      assert log =~
+               "block_suggestion eid-890 not acknowledged: the reply can't be encoded as JSON"
     end
 
     test "are acknowledged and ignored when the bot doesn't handle them" do
-      state = %{@state | bot: %{@bot | module: EventBot}}
+      state = %{@state | bot: %{@bot | module: EventBot}, handles_interactions?: false}
 
       assert {:reply, {:text, ~S({"envelope_id":"eid-890"})}, ^state} =
                Slack.Socket.handle_frame(
