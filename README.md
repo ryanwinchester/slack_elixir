@@ -148,9 +148,11 @@ end
 
 `send_message/2` sends to a channel ID, or to a user ID to message them directly.
 Messages are queued per channel and sent at most one per second, Slack's rate
-limit for posting to a channel. A channel's queue starts the first time the bot
-sends to it, so the bot doesn't list its conversations at startup, and the
-`channels` option that configured that is deprecated.
+limit for posting to a channel. Each ID has its own queue, so send to a
+conversation with the same ID, for example its channel ID rather than both that
+and the user's ID. A channel's queue starts the first time the bot sends to it,
+so the bot doesn't list its conversations at startup, and the `channels` option
+that configured that is deprecated.
 
 Interactions, such as button clicks, modal submissions and shortcuts, go to the
 optional `handle_interaction/3` callback with the payload's `"type"` (for example

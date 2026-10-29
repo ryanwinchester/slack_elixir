@@ -12,12 +12,15 @@ defmodule Slack.MessageServer do
   # ----------------------------------------------------------------------------
 
   def start_link({bot, channel}) do
-    Logger.info("[Slack.MessageServer] starting for #{bot.module} in #{channel}...")
     GenServer.start_link(__MODULE__, {bot, channel}, name: via_tuple(bot, channel))
   end
 
   # Queues the message on the channel's message server, which starts the first
   # time the bot sends to the channel.
+  def send(%Slack.Bot{module: bot_module}, channel, message) do
+    send(bot_module, channel, message)
+  end
+
   def send(bot_module, channel, message) when is_atom(bot_module) and is_binary(channel) do
     case message_server(bot_module, channel) do
       {:ok, message_server} ->
@@ -39,6 +42,8 @@ defmodule Slack.MessageServer do
 
   @impl true
   def init({bot, channel}) do
+    Logger.debug("[Slack.MessageServer] starting for #{bot.module} in #{channel}")
+
     state = %{
       bot: bot,
       channel: channel,
@@ -111,31 +116,34 @@ defmodule Slack.MessageServer do
   end
 
   defp message_server(bot_module, channel) do
-    case Registry.lookup(Slack.MessageServerRegistry, {bot_module, channel}) do
-      [{message_server, _value}] -> {:ok, message_server}
-      [] -> start_message_server(bot_module, channel)
+    case lookup(bot_module, channel) do
+      {:ok, bot, nil} -> start_message_server(bot, channel)
+      {:ok, _bot, message_server} -> {:ok, message_server}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Slack.Supervisor starts the registry, and keeps the bot in its metadata. The
+  # server is found by its registered name, which skips one that just exited.
+  defp lookup(bot_module, channel) do
+    case Registry.meta(Slack.MessageServerRegistry, bot_module) do
+      {:ok, bot} -> {:ok, bot, GenServer.whereis(via_tuple(bot_module, channel))}
+      :error -> {:error, :unknown_bot}
     end
   rescue
-    # Slack.Supervisor starts the registry, so it isn't running.
+    # The registry isn't running, so neither is Slack.Supervisor.
     ArgumentError -> {:error, :not_started}
   end
 
-  defp start_message_server(bot_module, channel) do
-    # Slack.Supervisor keeps the bot in the registry's metadata.
-    with {:ok, bot} <- registered_bot(bot_module) do
-      case DynamicSupervisor.start_child(Slack.DynamicSupervisor, {__MODULE__, {bot, channel}}) do
-        # Another process started it first.
-        {:error, {:already_started, message_server}} -> {:ok, message_server}
-        result -> result
-      end
+  defp start_message_server(bot, channel) do
+    case DynamicSupervisor.start_child(Slack.DynamicSupervisor, {__MODULE__, {bot, channel}}) do
+      # Another process started it first.
+      {:error, {:already_started, message_server}} -> {:ok, message_server}
+      result -> result
     end
-  end
-
-  defp registered_bot(bot_module) do
-    case Registry.meta(Slack.MessageServerRegistry, bot_module) do
-      {:ok, bot} -> {:ok, bot}
-      :error -> {:error, :unknown_bot}
-    end
+  catch
+    # The supervisor isn't running, for example while it restarts.
+    :exit, reason -> {:error, reason}
   end
 
   defp error_message(:not_started, _bot_module), do: "Slack.Supervisor isn't running"
