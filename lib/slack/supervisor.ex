@@ -20,17 +20,22 @@ defmodule Slack.Supervisor do
     {app_token, bot_config} = Keyword.pop!(bot_config, :app_token)
     {bot_token, bot_config} = Keyword.pop!(bot_config, :bot_token)
     {bot_module, bot_config} = Keyword.pop!(bot_config, :bot)
-    {channel_config, bot_config} = Keyword.pop(bot_config, :channels, [])
-    {ssl_options, _bot_config} = Keyword.pop(bot_config, :ssl_options, [])
+    {ssl_options, bot_config} = Keyword.pop(bot_config, :ssl_options, [])
+
+    if Keyword.has_key?(bot_config, :channels) do
+      Logger.warning(
+        "[Slack.Supervisor] the :channels option is deprecated and does nothing: " <>
+          "a channel's message queue now starts the first time the bot sends to it"
+      )
+    end
 
     bot = fetch_identity!(bot_token, bot_module)
 
     children = [
-      {Registry, keys: :unique, name: Slack.ChannelServerRegistry},
-      {Registry, keys: :unique, name: Slack.MessageServerRegistry},
+      # The bot is kept in the metadata, for the message servers to start with.
+      {Registry, keys: :unique, name: Slack.MessageServerRegistry, meta: [{bot_module, bot}]},
       {DynamicSupervisor, strategy: :one_for_one, name: Slack.DynamicSupervisor},
       {PartitionSupervisor, child_spec: Task.Supervisor, name: Slack.TaskSupervisors},
-      {Slack.ChannelServer, {bot, channel_config}},
       {Slack.Socket, {app_token, bot, ssl_options}}
     ]
 

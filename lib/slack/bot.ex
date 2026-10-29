@@ -76,7 +76,15 @@ defmodule Slack.Bot do
   Send a message to a channel.
 
   The `message` can be just the message text, or a `t:map/0` of properties that
-  are accepted by Slack's `chat.postMessage` API endpoint.
+  are accepted by Slack's `chat.postMessage` API endpoint. The `channel` can be
+  a channel ID, or a user ID to message them directly.
+
+  Messages are queued per channel and sent at most one per second, Slack's rate
+  limit for posting to a channel. Each ID has its own queue, so send to a
+  conversation with the same ID to keep to the rate limit. A channel's queue
+  starts the first time the bot sends to it. Returns `:ok` once the message is queued, or logs an error
+  and returns `{:error, reason}` when it can't be, for example when
+  `Slack.Supervisor` isn't running.
   """
   @spec send_message(String.t(), String.t() | map()) :: Macro.t()
   defmacro send_message(channel, message) do
